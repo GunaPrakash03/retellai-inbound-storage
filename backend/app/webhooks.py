@@ -1,3 +1,4 @@
+import base64
 import json
 import uuid
 
@@ -47,10 +48,9 @@ async def post_call(request: Request):
     _last_attempt.update({
         "signature_header": signature,
         "body_length": len(raw_body),
-        "body_preview": raw_body[:300].decode(errors="replace"),
+        "body_base64": base64.b64encode(raw_body).decode(),
         "api_key_length": len(api_key or ""),
         "verified": verified,
-        "all_headers": dict(request.headers),
     })
 
     if not verified:

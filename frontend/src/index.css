@@ -1,0 +1,342 @@
+:root {
+  --ink: #1b1e24;
+  --ink-soft: #5b6270;
+  --bg: #f3f4f7;
+  --panel: #ffffff;
+  --border: #dde1e7;
+  --accent: #3059c7;
+  --accent-soft: #e7ecfa;
+
+  --status-new-bg: #dce6ff;
+  --status-new-fg: #1d3fa0;
+  --status-reviewed-bg: #ffe9c7;
+  --status-reviewed-fg: #8a5a10;
+  --status-contacted-bg: #e3dcfb;
+  --status-contacted-fg: #5836ba;
+  --status-closed-bg: #dde1e7;
+  --status-closed-fg: #4a5160;
+
+  --cat-1: #2f6f4f;
+  --cat-2: #7a4b1e;
+  --cat-3: #1d6f83;
+  --cat-4: #a03d6b;
+  --cat-5: #8a2f2f;
+  --cat-6: #3a5a9e;
+  --cat-7: #6b6b1f;
+  --cat-8: #5a4a8a;
+  --cat-9: #2f7a6f;
+  --cat-10: #55606e;
+
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e7e9ee;
+    --ink-soft: #9aa2b1;
+    --bg: #14161b;
+    --panel: #1b1e25;
+    --border: #2b2f38;
+    --accent: #7f9dff;
+    --accent-soft: #23294a;
+
+    --status-new-bg: #23294a;
+    --status-new-fg: #a9bcff;
+    --status-reviewed-bg: #3d3220;
+    --status-reviewed-fg: #f0c584;
+    --status-contacted-bg: #322a4d;
+    --status-contacted-fg: #c9b6f5;
+    --status-closed-bg: #2b2f38;
+    --status-closed-fg: #b6bcc7;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  background: var(--panel);
+}
+
+.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.subtitle {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.error-banner {
+  background: #fde2e2;
+  color: #8a1f1f;
+  padding: 10px 28px;
+  font-size: 14px;
+}
+
+.app-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr);
+  gap: 1px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.case-list,
+.case-detail {
+  background: var(--panel);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.case-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filters select {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  flex: 1;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+th {
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: var(--accent-soft);
+}
+
+tbody tr.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.caller-name {
+  font-weight: 600;
+}
+
+.caller-phone {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-cell {
+  max-width: 320px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.badge.cat-personal_injury { background: var(--cat-1); }
+.badge.cat-workplace_employment { background: var(--cat-2); }
+.badge.cat-medical_product { background: var(--cat-3); }
+.badge.cat-family_law { background: var(--cat-4); }
+.badge.cat-criminal_defense { background: var(--cat-5); }
+.badge.cat-immigration { background: var(--cat-6); }
+.badge.cat-real_estate_housing { background: var(--cat-7); }
+.badge.cat-business_contract { background: var(--cat-8); }
+.badge.cat-estate_disability { background: var(--cat-9); }
+.badge.cat-other { background: var(--cat-10); }
+
+.flag {
+  margin-left: 6px;
+  color: #b45309;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.status-new { background: var(--status-new-bg); color: var(--status-new-fg); }
+.status-reviewed { background: var(--status-reviewed-bg); color: var(--status-reviewed-fg); }
+.status-contacted { background: var(--status-contacted-bg); color: var(--status-contacted-fg); }
+.status-closed { background: var(--status-closed-bg); color: var(--status-closed-fg); }
+
+.empty-state {
+  padding: 40px 24px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-align: center;
+}
+
+.case-detail {
+  padding: 20px 24px 40px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.detail-header select {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.case-summary-text {
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  color: var(--ink-soft);
+}
+
+.field-value {
+  font-weight: 500;
+  text-align: right;
+}
+
+.case-detail h3 {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin: 22px 0 8px;
+}
+
+.transcript {
+  white-space: pre-wrap;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.meta-footer {
+  margin-top: 24px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+@media (max-width: 860px) {
+  .app-body {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+  }
+}

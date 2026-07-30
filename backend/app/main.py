@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .db import get_case, list_cases, update_status
 from .schemas import StatusUpdate
-from .webhooks import router as webhook_router
+from .webhooks import _last_attempt, router as webhook_router
 
 app = FastAPI(title="Retell Intake Backend")
 app.state.retell_api_key = os.getenv("RETELL_API_KEY", "")
@@ -32,6 +32,13 @@ def health():
 @app.get("/cases")
 def get_cases(limit: int = 50, category: str | None = None, status: str | None = None):
     return list_cases(limit=limit, category=category, status=status)
+
+
+@app.get("/debug/last-webhook")
+def debug_last_webhook():
+    """TEMPORARY — inspect the last webhook attempt to diagnose signature
+    mismatches. Does not expose the API key itself, only its length."""
+    return _last_attempt or {"message": "no webhook attempt received yet"}
 
 
 @app.post("/debug/seed")

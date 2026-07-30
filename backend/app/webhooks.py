@@ -8,6 +8,11 @@ from .security import verify_signature
 
 router = APIRouter()
 
+# TEMPORARY — captures the last raw webhook attempt for debugging signature
+# mismatches. Remove _last_attempt and the /debug/last-webhook route below
+# once verification is confirmed working against a real Retell request.
+_last_attempt: dict = {}
+
 
 @router.post("/webhooks/retell/inbound")
 async def inbound(request: Request):
@@ -38,7 +43,17 @@ async def post_call(request: Request):
     signature = request.headers.get("x-retell-signature")
     api_key = request.app.state.retell_api_key
 
-    if not verify_signature(raw_body, api_key, signature):
+    verified = verify_signature(raw_body, api_key, signature)
+    _last_attempt.update({
+        "signature_header": signature,
+        "body_length": len(raw_body),
+        "body_preview": raw_body[:300].decode(errors="replace"),
+        "api_key_length": len(api_key or ""),
+        "verified": verified,
+        "all_headers": dict(request.headers),
+    })
+
+    if not verified:
         return Response(status_code=401)
 
     try:

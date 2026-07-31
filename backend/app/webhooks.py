@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response
 
 from .db import find_caller_history, upsert_record
 from .security import verify_signature
-from .validators import is_valid_email, is_valid_phone
+from .validators import is_valid_email, is_valid_phone, normalize_category
 
 router = APIRouter()
 
@@ -71,7 +71,8 @@ async def post_call(request: Request):
         d = analysis.get("custom_analysis_data", {}) or {}
 
         emergency_flagged = int(bool(d.get("emergency_flagged")))
-        required = (d.get("caller_name"), d.get("callback_phone"), d.get("case_category"), d.get("case_summary"))
+        case_category = normalize_category(d.get("case_category"))
+        required = (d.get("caller_name"), d.get("callback_phone"), case_category, d.get("case_summary"))
         is_complete = all(required)
 
         # call_outcome is a Post-Call Data Extraction field (Selector:
@@ -97,7 +98,7 @@ async def post_call(request: Request):
             "id": str(uuid.uuid4()),
             "call_id": call.get("call_id"),
             "from_number": call.get("from_number"),
-            "case_category": d.get("case_category"),
+            "case_category": case_category,
             "caller_name": d.get("caller_name"),
             "callback_phone": d.get("callback_phone"),
             "is_phone_valid": None if phone_valid is None else int(phone_valid),

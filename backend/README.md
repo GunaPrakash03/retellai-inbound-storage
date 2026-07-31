@@ -24,8 +24,13 @@ Interactive API docs: http://localhost:8000/docs
 
 ## Call buckets
 
-Every analyzed call lands in exactly one table, based on `emergency_flagged`
-and `call_outcome` (see below):
+Every analyzed call lands in exactly one table. Routing is decided by
+`app/webhooks.py`, primarily by searching the call transcript for the
+agent's own scripted closing lines (see `detect_outcome_from_transcript` in
+`app/validators.py`) — this is deterministic since we control the exact
+wording of every ending, unlike Retell's own `call_outcome` extraction
+field, which repeatedly mislabeled calls in testing and is now only a
+fallback for when the transcript is missing:
 
 | Bucket (table) | When a call lands here |
 |---|---|
@@ -73,11 +78,10 @@ from `call.call_analysis.custom_analysis_data`.
 Keep the default `Call Summary`, `Call Successful`, and `User Sentiment`
 fields too — the backend stores those alongside the custom ones.
 
-`call_outcome` drives which bucket table a call lands in (see "Call buckets"
-above), together with `emergency_flagged`. If `call_outcome` isn't
-configured yet, the backend falls back to a heuristic: complete core fields
-→ `cases`, otherwise → `partial_calls`. Configuring `call_outcome` is what
-lets `unwanted_calls` and `spam_calls` get populated at all.
+`call_outcome` is a fallback signal only — bucket routing is primarily
+decided by matching the agent's scripted closing lines directly in the
+transcript (see "Call buckets" above). Configuring `call_outcome` is
+optional at this point but doesn't hurt to keep as a backup.
 
 ## Signature verification
 

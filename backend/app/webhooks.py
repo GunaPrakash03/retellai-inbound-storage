@@ -27,12 +27,15 @@ async def inbound(request: Request):
     history = find_caller_history(from_number) if from_number else []
     most_recent = history[0] if history else None
 
+    # Dynamic variables must always be strings — a partial call has no
+    # category or summary on file (NULL in the DB), and letting a JSON null
+    # or the text "None" through would end up spoken in the greeting.
     return {
         "call_inbound": {
             "dynamic_variables": {
                 "caller_known": "true" if most_recent else "false",
-                "previous_case_category": most_recent["case_category"] if most_recent else "",
-                "previous_case_summary": most_recent["case_summary"] if most_recent else "",
+                "previous_case_category": (most_recent or {}).get("case_category") or "",
+                "previous_case_summary": (most_recent or {}).get("case_summary") or "",
             }
         }
     }
@@ -65,6 +68,12 @@ async def post_call(request: Request):
 
     event = payload.get("event")
     call = payload.get("call", {})
+
+    # call_id is the primary key for every bucket; without one there is
+    # nothing to store the record under, and inserting would crash on the
+    # NOT NULL constraint and hand Retell a 500.
+    if event == "call_analyzed" and not call.get("call_id"):
+        return Response(status_code=204)
 
     if event == "call_analyzed":
         analysis = call.get("call_analysis", {}) or {}

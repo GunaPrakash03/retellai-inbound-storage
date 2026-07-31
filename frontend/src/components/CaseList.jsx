@@ -1,16 +1,5 @@
 import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
-
-function timeAgo(isoString) {
-  if (!isoString) return "—";
-  const then = new Date(isoString.replace(" ", "T") + "Z").getTime();
-  const diffMin = Math.round((Date.now() - then) / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.round(diffHr / 24);
-  return `${diffDay}d ago`;
-}
+import { timeAgo } from "../format";
 
 export default function CaseList({
   cases,
@@ -44,17 +33,19 @@ export default function CaseList({
       </div>
 
       <div className="table-wrap">
-        {loading ? (
-          <div className="empty-state">Loading cases…</div>
+        {loading && cases.length === 0 ? (
+          <div className="empty-state">Loading…</div>
         ) : cases.length === 0 ? (
-          <div className="empty-state">No cases match these filters.</div>
+          <div className="empty-state">No calls match these filters.</div>
         ) : (
           <table>
             <thead>
               <tr>
+                <th>Case #</th>
                 <th>Category</th>
                 <th>Caller</th>
                 <th>Summary</th>
+                <th>Assigned</th>
                 <th>Status</th>
                 <th>Received</th>
               </tr>
@@ -66,11 +57,14 @@ export default function CaseList({
                   className={c.call_id === selectedCallId ? "selected" : ""}
                   onClick={() => onSelect(c.call_id)}
                 >
+                  <td className="case-number">{c.case_number || "—"}</td>
                   <td>
                     <span className={`badge cat-${c.case_category || "other"}`}>
                       {CATEGORY_LABELS[c.case_category] || "Uncategorized"}
                     </span>
-                    {!!c.emergency_flagged && <span className="flag" title="Safety branch was triggered on this call">⚠</span>}
+                    {!!c.emergency_flagged && (
+                      <span className="flag" title="Safety branch was triggered on this call">⚠</span>
+                    )}
                   </td>
                   <td>
                     <div className="caller-name">{c.caller_name || "Unknown"}</div>
@@ -82,8 +76,11 @@ export default function CaseList({
                     </div>
                   </td>
                   <td className="summary-cell">{c.case_summary || "—"}</td>
+                  <td className="nowrap">{c.assigned_to || "—"}</td>
                   <td>
-                    <span className={`pill status-${c.status}`}>{STATUS_LABELS[c.status] || c.status}</span>
+                    <span className={`pill status-${c.status}`}>
+                      {STATUS_LABELS[c.status] || c.status}
+                    </span>
                   </td>
                   <td className="nowrap">{timeAgo(c.created_at)}</td>
                 </tr>

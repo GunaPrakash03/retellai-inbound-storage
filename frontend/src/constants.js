@@ -22,11 +22,19 @@ export const STATUS_LABELS = {
   closed: "Closed",
 };
 
+// `table` maps the URL-friendly bucket key to the backend table name that
+// /counts reports under.
 export const BUCKETS = [
-  { key: "cases", label: "Full Cases", description: "Calls where the caller completed intake" },
-  { key: "partial-calls", label: "Partial Calls", description: "Calls that disconnected before intake finished" },
-  { key: "unwanted-calls", label: "Unwanted Calls", description: "Nonsensical, prank, or unusable calls" },
-  { key: "spam-calls", label: "Spam Calls", description: "Caller wouldn't answer the actual intake questions" },
-  { key: "out-of-scope-calls", label: "Out of Scope", description: "Genuine callers who reached the wrong business" },
-  { key: "emergency-flags", label: "Emergency Flags", description: "Calls where the 911/safety branch fired" },
+  { key: "cases", table: "cases", label: "Cases", description: "Callers who completed intake" },
+  { key: "emergency-flags", table: "emergency_flags", label: "Emergency", description: "The 911/safety branch fired — review first", urgent: true },
+  { key: "partial-calls", table: "partial_calls", label: "Partial", description: "Dropped before intake finished" },
+  { key: "out-of-scope-calls", table: "out_of_scope_calls", label: "Out of Scope", description: "Reached the wrong business" },
+  { key: "unwanted-calls", table: "unwanted_calls", label: "Unwanted", description: "Nonsensical or prank calls" },
+  { key: "spam-calls", table: "spam_calls", label: "Spam", description: "Wouldn't answer the questions" },
 ];
+
+// Non-bucket destinations in the sidebar.
+export const VIEWS = {
+  MESSAGES: "messages",
+  STAFF: "staff",
+};

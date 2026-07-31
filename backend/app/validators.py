@@ -27,15 +27,15 @@ def normalize_category(category: str | None) -> str | None:
 
 
 def is_valid_phone(phone: str | None) -> bool | None:
-    """A US callback number: exactly 10 digits, optionally with a leading
-    country code 1. Returns None (unknown) if no phone was captured at all,
-    rather than False, so an empty field isn't shown as "invalid"."""
+    """The callback number itself must be exactly 10 digits, with an
+    optional 1-3 digit country code in front (matches the agent prompt's
+    phone number rules). Returns None (unknown) if no phone was captured at
+    all, rather than False, so an empty field isn't shown as "invalid"."""
     if not phone:
         return None
     digits = re.sub(r"\D", "", phone)
-    if len(digits) == 11 and digits.startswith("1"):
-        digits = digits[1:]
-    return len(digits) == 10
+    extra = len(digits) - 10
+    return 0 <= extra <= 3
 
 
 def is_valid_email(email: str | None) -> bool | None:

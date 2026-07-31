@@ -42,3 +42,32 @@ def is_valid_email(email: str | None) -> bool | None:
     if not email:
         return None
     return bool(_EMAIL_RE.match(email.strip()))
+
+
+# Exact (lowercased) fragments lifted from the agent prompt's own scripted
+# endings. Retell's call_outcome Post-Call Data Extraction field has been
+# observed to mislabel calls as "completed" even when the transcript
+# contains one of these verbatim — searching the transcript ourselves for
+# text we control is deterministic where an LLM classification isn't.
+_OUTCOME_PHRASES = [
+    ("emergency", "hang up and call 911 right now"),
+    ("emergency", "your safety comes first"),
+    ("unwanted", "having a hard time following the details"),
+    ("spam", "might not be the right time to go through these details"),
+    ("partial", "we may have gotten disconnected"),
+    ("completed", "i have everything i need"),
+]
+
+
+def detect_outcome_from_transcript(transcript: str | None) -> str | None:
+    """Returns one of "emergency"/"unwanted"/"spam"/"partial"/"completed" by
+    matching the agent's own scripted closing lines in the transcript, or
+    None if no scripted ending is present (e.g. the call dropped for a
+    reason outside the agent's control)."""
+    if not transcript:
+        return None
+    lowered = transcript.lower()
+    for outcome, phrase in _OUTCOME_PHRASES:
+        if phrase in lowered:
+            return outcome
+    return None

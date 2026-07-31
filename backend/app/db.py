@@ -170,10 +170,20 @@ def update_status(call_id: str, status: str) -> None:
 
 
 def find_caller_history(from_number: str, limit: int = 5) -> list[dict]:
+    """Past calls from this number, most recent first.
+
+    Searches every bucket, not just completed cases — someone whose first
+    call dropped early sits in partial_calls, and someone who hit the safety
+    branch sits in emergency_flags. Looking only at `cases` would greet both
+    as first-time callers.
+    """
+    union = " UNION ALL ".join(
+        f"SELECT id, case_category, case_summary, created_at, '{t}' AS bucket "
+        f"FROM {t} WHERE from_number = :from_number"
+        for t in BUCKETS
+    )
     rows = _conn.execute(
-        """SELECT id, case_category, case_summary, created_at
-           FROM cases WHERE from_number = :from_number
-           ORDER BY created_at DESC LIMIT :limit""",
+        f"SELECT * FROM ({union}) ORDER BY created_at DESC LIMIT :limit",
         {"from_number": from_number, "limit": limit},
     ).fetchall()
     return [dict(r) for r in rows]

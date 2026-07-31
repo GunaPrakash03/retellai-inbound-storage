@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import uuid
 
 from fastapi import APIRouter, Request, Response
@@ -42,7 +43,7 @@ async def post_call(request: Request):
     Only call_analyzed carries the structured Post-Call Data Extraction fields."""
     raw_body = await request.body()
     signature = request.headers.get("x-retell-signature")
-    api_key = request.app.state.retell_api_key
+    api_key = os.getenv("RETELL_API_KEY", "").strip()
 
     verified = verify_signature(raw_body, api_key, signature)
     _last_attempt.update({

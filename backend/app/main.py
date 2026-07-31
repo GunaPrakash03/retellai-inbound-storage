@@ -12,7 +12,6 @@ from .schemas import StatusUpdate
 from .webhooks import _last_attempt, router as webhook_router
 
 app = FastAPI(title="Retell Intake Backend")
-app.state.retell_api_key = os.getenv("RETELL_API_KEY", "")
 
 app.add_middleware(
     CORSMiddleware,

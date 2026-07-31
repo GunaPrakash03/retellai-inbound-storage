@@ -15,12 +15,12 @@ Interactive API docs: http://localhost:8000/docs
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/webhooks/retell/inbound` | Fires before the call connects. Looks up caller history, returns dynamic variables. |
-| `POST` | `/webhooks/retell` | Fires on `call_started` / `call_ended` / `call_analyzed`. Only `call_analyzed` writes to the DB, into one of the five buckets below. |
+| `POST` | `/webhooks/retell` | Fires on `call_started` / `call_ended` / `call_analyzed`. Only `call_analyzed` writes to the DB, into one of the six buckets below. |
 | `GET` | `/cases` | List completed cases. Query params: `category`, `status`, `limit`. |
 | `GET` | `/cases/{call_id}` | Full detail for one case, including transcript. |
 | `PATCH` | `/cases/{call_id}` | Update triage status. Body: `{"status": "reviewed"}`. |
-| `GET` | `/partial-calls`, `/unwanted-calls`, `/spam-calls`, `/emergency-flags` | Same shape as `/cases`, for the other four buckets. |
-| `GET` \| `PATCH` | `/{bucket}/{call_id}` | Detail / status update for a non-`cases` bucket (`partial-calls`, `unwanted-calls`, `spam-calls`, or `emergency-flags`). |
+| `GET` | `/partial-calls`, `/unwanted-calls`, `/spam-calls`, `/out-of-scope-calls`, `/emergency-flags` | Same shape as `/cases`, for the other five buckets. |
+| `GET` \| `PATCH` | `/{bucket}/{call_id}` | Detail / status update for a non-`cases` bucket (`partial-calls`, `unwanted-calls`, `spam-calls`, `out-of-scope-calls`, or `emergency-flags`). |
 
 ## Call buckets
 
@@ -38,6 +38,7 @@ fallback for when the transcript is missing:
 | `partial_calls` | Call disconnected or was cut short before intake finished. |
 | `unwanted_calls` | Nonsensical, contradictory, or clearly not a real intake (prank/test calls). |
 | `spam_calls` | Caller was coherent but repeatedly refused/deflected the actual intake questions. |
+| `out_of_scope_calls` | Genuine, polite callers who reached the wrong business (a technical question, a sales question, a wrong number). Not a legal matter, so not an intake — kept separate so the attorney queue stays clean and a spike here is visible (it can mean the number is listed somewhere wrong). |
 | `emergency_flags` | The 911/safety branch fired — saved here regardless of completeness, since staff need visibility on safety events. |
 
 ## Data validation
@@ -48,8 +49,9 @@ if the field was never captured at all). A call is never blocked or
 rerouted for failing validation — it's saved normally and the invalid field
 is just flagged, since staff still need the record even if the phone number
 needs a follow-up to confirm. `is_phone_valid` requires exactly 10 digits
-(a leading US country code `1` is stripped first if present); `is_email_valid`
-requires a `local@domain.tld`-shaped address.
+after allowing for an optional 1-3 digit country code prefix, matching the
+phone-number rules in the agent prompt; `is_email_valid` requires a
+`local@domain.tld`-shaped address.
 
 ## Post-Call Data Extraction fields to configure in Retell
 

@@ -87,6 +87,8 @@ async def post_call(request: Request):
 
         if emergency_flagged or transcript_outcome == "emergency":
             table = "emergency_flags"
+        elif transcript_outcome == "out_of_scope":
+            table = "out_of_scope_calls"
         elif transcript_outcome == "unwanted" or (transcript_outcome is None and outcome == "unwanted"):
             table = "unwanted_calls"
         elif transcript_outcome == "spam" or (transcript_outcome is None and outcome == "spam"):

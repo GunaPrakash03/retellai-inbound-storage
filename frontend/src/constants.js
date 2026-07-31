@@ -27,5 +27,6 @@ export const BUCKETS = [
   { key: "partial-calls", label: "Partial Calls", description: "Calls that disconnected before intake finished" },
   { key: "unwanted-calls", label: "Unwanted Calls", description: "Nonsensical, prank, or unusable calls" },
   { key: "spam-calls", label: "Spam Calls", description: "Caller wouldn't answer the actual intake questions" },
+  { key: "out-of-scope-calls", label: "Out of Scope", description: "Genuine callers who reached the wrong business" },
   { key: "emergency-flags", label: "Emergency Flags", description: "Calls where the 911/safety branch fired" },
 ];

@@ -5,11 +5,18 @@ from pathlib import Path
 DB_PATH = os.getenv("DB_PATH", "./data/cases.db")
 Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-# Every call bucket (full cases, partial/disconnected calls, unwanted /
-# nonsensical calls, spam / evasive calls, safety-emergency calls) is stored
-# in its own table with this identical shape, so a call can only ever land
-# in one bucket.
-BUCKETS = ["cases", "partial_calls", "unwanted_calls", "spam_calls", "emergency_flags"]
+# Every call bucket is stored in its own table with this identical shape, so
+# a call can only ever land in one bucket: completed intakes, calls that
+# dropped early, nonsensical/prank calls, evasive callers, people who
+# reached the wrong business, and safety escalations.
+BUCKETS = [
+    "cases",
+    "partial_calls",
+    "unwanted_calls",
+    "spam_calls",
+    "out_of_scope_calls",
+    "emergency_flags",
+]
 
 _TABLE_TEMPLATE = """
 CREATE TABLE IF NOT EXISTS {table} (

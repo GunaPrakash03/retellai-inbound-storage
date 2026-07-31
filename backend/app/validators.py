@@ -65,6 +65,18 @@ _OUTCOME_PATTERNS = [
         "your safety comes first",
         "local emergency number",
     )),
+    # Genuine callers who reached the wrong business (a coding question, a
+    # pricing question). Checked before the "difficult caller" endings below
+    # because these people are polite and coherent — they just need somewhere
+    # other than the attorney review queue.
+    ("out_of_scope", (
+        "isn't something our law office",
+        "not something our law office",
+        "only handle legal matters",
+        "not the right place for",
+        "not something we can help with",
+        "not the right office",
+    )),
     ("unwanted", (
         "hard time following",
         "following you clearly",

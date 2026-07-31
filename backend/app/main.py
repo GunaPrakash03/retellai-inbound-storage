@@ -102,6 +102,7 @@ BUCKET_TABLES = {
     "partial-calls": "partial_calls",
     "unwanted-calls": "unwanted_calls",
     "spam-calls": "spam_calls",
+    "out-of-scope-calls": "out_of_scope_calls",
     "emergency-flags": "emergency_flags",
 }
 

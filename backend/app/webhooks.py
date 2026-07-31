@@ -77,8 +77,12 @@ async def post_call(request: Request):
 
         # call_outcome is a Post-Call Data Extraction field (Selector:
         # completed / partial / unwanted / spam) matching the closing
-        # scripts in the agent prompt. Older calls made before that field
-        # existed fall back to a heuristic based on whether intake finished.
+        # scripts in the agent prompt. It's only trusted for "unwanted" and
+        # "spam", since those can't be derived any other way — Retell's own
+        # classification of "completed" has been observed to be wrong (e.g.
+        # labeling a call "completed" with every core field still empty), so
+        # completeness is always checked directly rather than taking that
+        # label's word for it.
         outcome = d.get("call_outcome")
         if emergency_flagged:
             table = "emergency_flags"
@@ -86,7 +90,7 @@ async def post_call(request: Request):
             table = "unwanted_calls"
         elif outcome == "spam":
             table = "spam_calls"
-        elif outcome == "completed" or (outcome is None and is_complete):
+        elif is_complete:
             table = "cases"
         else:
             table = "partial_calls"

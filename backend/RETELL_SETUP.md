@@ -4,6 +4,10 @@ This is the complete checklist for configuring the Retell agent for this
 project, end to end. Everything here lives in Retell's dashboard, not in
 this repo — the repo only defines what the backend expects to receive.
 
+For giving the agent a real inbound phone number via Twilio (SIP trunking),
+see `RETELL_TWILIO_SETUP.md` — that's a separate, optional layer on top of
+everything here.
+
 ## 1. Webhook URLs
 
 Set these under **Agent → Webhook Settings**, using your backend's public

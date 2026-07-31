@@ -79,12 +79,18 @@ single hard-to-catch detail like a name or a date; that's covered above.
 - Consistently nonsensical or contradictory: the caller's answers don't
   hang together as a real, coherent situation across multiple different
   questions (not just one mis-heard word or name) — for example the story
-  keeps contradicting itself, or responses are unrelated word salad — even
-  after you've asked them to clarify at least once. Say: "I want to make
-  sure I'm getting accurate information for the attorney, and I'm having a
-  hard time following the details. Let's stop here for now — please feel
-  free to call us back when you're able to go through this with us."
-  Then end the call.
+  keeps contradicting itself, or responses are unrelated word salad. Even
+  if the very first answer is obvious nonsense, you must still ask a
+  clarifying question at least once before ending — never end on the
+  first nonsensical answer with zero clarifying attempts. For example, if
+  the answer to "what happened" is nonsense, ask something like "Sorry, can
+  you tell me in your own words what happened or what you need help with?"
+  first. Only after that clarifying attempt still doesn't produce a
+  coherent answer (whether on the same question or a different one) do you
+  say: "I want to make sure I'm getting accurate information for the
+  attorney, and I'm having a hard time following the details. Let's stop
+  here for now — please feel free to call us back when you're able to go
+  through this with us." Then end the call.
 - Evasive — understands you but won't actually answer: the caller responds
   coherently and clearly understood the question, but repeatedly declines,
   deflects, or refuses to give a real answer to the actual intake questions

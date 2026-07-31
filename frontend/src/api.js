@@ -10,20 +10,20 @@ async function request(path, options) {
   return res.json();
 }
 
-export function listCases({ category, status } = {}) {
+export function listRecords(bucket, { category, status } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);
   if (status) params.set("status", status);
   const qs = params.toString();
-  return request(`/cases${qs ? `?${qs}` : ""}`);
+  return request(`/${bucket}${qs ? `?${qs}` : ""}`);
 }
 
-export function getCase(callId) {
-  return request(`/cases/${encodeURIComponent(callId)}`);
+export function getRecord(bucket, callId) {
+  return request(`/${bucket}/${encodeURIComponent(callId)}`);
 }
 
-export function updateStatus(callId, status) {
-  return request(`/cases/${encodeURIComponent(callId)}`, {
+export function updateRecordStatus(bucket, callId, status) {
+  return request(`/${bucket}/${encodeURIComponent(callId)}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
   });

@@ -5,8 +5,9 @@ import uuid
 
 from fastapi import APIRouter, Request, Response
 
-from .db import find_caller_history, upsert_case
+from .db import find_caller_history, upsert_record
 from .security import verify_signature
+from .validators import is_valid_email, is_valid_phone
 
 router = APIRouter()
 
@@ -69,21 +70,46 @@ async def post_call(request: Request):
         analysis = call.get("call_analysis", {}) or {}
         d = analysis.get("custom_analysis_data", {}) or {}
 
-        upsert_case({
+        emergency_flagged = int(bool(d.get("emergency_flagged")))
+        required = (d.get("caller_name"), d.get("callback_phone"), d.get("case_category"), d.get("case_summary"))
+        is_complete = all(required)
+
+        # call_outcome is a Post-Call Data Extraction field (Selector:
+        # completed / partial / unwanted / spam) matching the closing
+        # scripts in the agent prompt. Older calls made before that field
+        # existed fall back to a heuristic based on whether intake finished.
+        outcome = d.get("call_outcome")
+        if emergency_flagged:
+            table = "emergency_flags"
+        elif outcome == "unwanted":
+            table = "unwanted_calls"
+        elif outcome == "spam":
+            table = "spam_calls"
+        elif outcome == "completed" or (outcome is None and is_complete):
+            table = "cases"
+        else:
+            table = "partial_calls"
+
+        phone_valid = is_valid_phone(d.get("callback_phone"))
+        email_valid = is_valid_email(d.get("email"))
+
+        row = {
             "id": str(uuid.uuid4()),
             "call_id": call.get("call_id"),
             "from_number": call.get("from_number"),
             "case_category": d.get("case_category"),
             "caller_name": d.get("caller_name"),
             "callback_phone": d.get("callback_phone"),
+            "is_phone_valid": None if phone_valid is None else int(phone_valid),
             "email": d.get("email"),
+            "is_email_valid": None if email_valid is None else int(email_valid),
             "incident_date": d.get("incident_date"),
             "location": d.get("location"),
             "opposing_party": d.get("opposing_party"),
             "key_date_or_deadline": d.get("key_date_or_deadline"),
             "represented_already": int(bool(d.get("represented_already"))),
             "injured": int(bool(d.get("injured"))),
-            "emergency_flagged": int(bool(d.get("emergency_flagged"))),
+            "emergency_flagged": emergency_flagged,
             "police_report_filed": int(bool(d.get("police_report_filed"))),
             "case_summary": d.get("case_summary"),
             "additional_details": d.get("additional_details"),
@@ -92,6 +118,8 @@ async def post_call(request: Request):
             "user_sentiment": analysis.get("user_sentiment"),
             "transcript": call.get("transcript"),
             "recording_url": call.get("recording_url"),
-        })
+        }
+
+        upsert_record(table, row)
 
     return Response(status_code=204)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCase, updateStatus } from "../api";
+import { getRecord, updateRecordStatus } from "../api";
 import { CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
 
 const FIELD_ROWS = [
@@ -15,6 +15,8 @@ const FIELD_ROWS = [
   ["police_report_filed", "Police report filed"],
 ];
 
+const VALIDITY_KEYS = { callback_phone: "is_phone_valid", email: "is_email_valid" };
+
 function formatValue(key, value) {
   if (value === null || value === undefined || value === "") return "—";
   if (["represented_already", "injured", "police_report_filed"].includes(key)) {
@@ -23,7 +25,7 @@ function formatValue(key, value) {
   return value;
 }
 
-export default function CaseDetail({ callId, onStatusChanged }) {
+export default function CaseDetail({ bucket, callId, onStatusChanged }) {
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -33,11 +35,11 @@ export default function CaseDetail({ callId, onStatusChanged }) {
     if (!callId) return;
     setLoading(true);
     setError(null);
-    getCase(callId)
+    getRecord(bucket, callId)
       .then(setCaseData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [callId]);
+  }, [bucket, callId]);
 
   if (!callId) {
     return (
@@ -59,7 +61,7 @@ export default function CaseDetail({ callId, onStatusChanged }) {
     const status = e.target.value;
     setSavingStatus(true);
     try {
-      const updated = await updateStatus(callId, status);
+      const updated = await updateRecordStatus(bucket, callId, status);
       setCaseData(updated);
       onStatusChanged?.();
     } catch (err) {
@@ -94,12 +96,23 @@ export default function CaseDetail({ callId, onStatusChanged }) {
       <p className="case-summary-text">{caseData.case_summary || "No summary captured."}</p>
 
       <div className="field-grid">
-        {FIELD_ROWS.map(([key, label]) => (
-          <div className="field-row" key={key}>
-            <span className="field-label">{label}</span>
-            <span className="field-value">{formatValue(key, caseData[key])}</span>
-          </div>
-        ))}
+        {FIELD_ROWS.map(([key, label]) => {
+          const validityKey = VALIDITY_KEYS[key];
+          const isInvalid = validityKey && caseData[key] && caseData[validityKey] === 0;
+          return (
+            <div className="field-row" key={key}>
+              <span className="field-label">{label}</span>
+              <span className="field-value">
+                {formatValue(key, caseData[key])}
+                {isInvalid && (
+                  <span className="flag" title={`This ${label.toLowerCase()} doesn't look valid — may need a callback to confirm`}>
+                    ⚠ invalid
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {caseData.additional_details && (

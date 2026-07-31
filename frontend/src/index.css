@@ -88,6 +88,37 @@ body {
   font-size: 13px;
 }
 
+.bucket-nav {
+  display: flex;
+  gap: 4px;
+  padding: 10px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.bucket-nav button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.bucket-nav button:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.bucket-nav button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .error-banner {
   background: #fde2e2;
   color: #8a1f1f;

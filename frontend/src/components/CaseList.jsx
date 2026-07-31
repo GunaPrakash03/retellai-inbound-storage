@@ -74,7 +74,12 @@ export default function CaseList({
                   </td>
                   <td>
                     <div className="caller-name">{c.caller_name || "Unknown"}</div>
-                    <div className="caller-phone">{c.callback_phone || c.from_number || "—"}</div>
+                    <div className="caller-phone">
+                      {c.callback_phone || c.from_number || "—"}
+                      {c.callback_phone && c.is_phone_valid === 0 && (
+                        <span className="flag" title="This phone number doesn't look valid">⚠</span>
+                      )}
+                    </div>
                   </td>
                   <td className="summary-cell">{c.case_summary || "—"}</td>
                   <td>

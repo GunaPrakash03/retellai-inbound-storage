@@ -15,10 +15,36 @@ Interactive API docs: http://localhost:8000/docs
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/webhooks/retell/inbound` | Fires before the call connects. Looks up caller history, returns dynamic variables. |
-| `POST` | `/webhooks/retell` | Fires on `call_started` / `call_ended` / `call_analyzed`. Only `call_analyzed` writes to the DB. |
-| `GET` | `/cases` | List cases. Query params: `category`, `status`, `limit`. |
+| `POST` | `/webhooks/retell` | Fires on `call_started` / `call_ended` / `call_analyzed`. Only `call_analyzed` writes to the DB, into one of the five buckets below. |
+| `GET` | `/cases` | List completed cases. Query params: `category`, `status`, `limit`. |
 | `GET` | `/cases/{call_id}` | Full detail for one case, including transcript. |
 | `PATCH` | `/cases/{call_id}` | Update triage status. Body: `{"status": "reviewed"}`. |
+| `GET` | `/partial-calls`, `/unwanted-calls`, `/spam-calls`, `/emergency-flags` | Same shape as `/cases`, for the other four buckets. |
+| `GET` \| `PATCH` | `/{bucket}/{call_id}` | Detail / status update for a non-`cases` bucket (`partial-calls`, `unwanted-calls`, `spam-calls`, or `emergency-flags`). |
+
+## Call buckets
+
+Every analyzed call lands in exactly one table, based on `emergency_flagged`
+and `call_outcome` (see below):
+
+| Bucket (table) | When a call lands here |
+|---|---|
+| `cases` | Intake completed — has caller name, callback phone, category, and summary. |
+| `partial_calls` | Call disconnected or was cut short before intake finished. |
+| `unwanted_calls` | Nonsensical, contradictory, or clearly not a real intake (prank/test calls). |
+| `spam_calls` | Caller was coherent but repeatedly refused/deflected the actual intake questions. |
+| `emergency_flags` | The 911/safety branch fired — saved here regardless of completeness, since staff need visibility on safety events. |
+
+## Data validation
+
+`callback_phone` and `email` are each checked by `app/validators.py` and get
+a companion `is_phone_valid` / `is_email_valid` column (`1`, `0`, or `null`
+if the field was never captured at all). A call is never blocked or
+rerouted for failing validation — it's saved normally and the invalid field
+is just flagged, since staff still need the record even if the phone number
+needs a follow-up to confirm. `is_phone_valid` requires exactly 10 digits
+(a leading US country code `1` is stripped first if present); `is_email_valid`
+requires a `local@domain.tld`-shaped address.
 
 ## Post-Call Data Extraction fields to configure in Retell
 
@@ -42,9 +68,16 @@ from `call.call_analysis.custom_analysis_data`.
 | `police_report_filed` | Boolean | Was a police report filed |
 | `case_summary` | Text | One or two sentence description of the situation |
 | `additional_details` | Text | Catch-all for anything category-specific not covered above |
+| `call_outcome` | Selector | One of: completed, partial, unwanted, spam — how the call actually ended. Use "completed" if the caller went through the full intake and got the closing readback. Use "partial" if the call disconnected, the caller hung up, or the agent had to end it early due to being unresponsive. Use "unwanted" if the call was a prank, test, or the caller's answers never formed a coherent, real situation. Use "spam" if the caller was coherent and understood the questions but repeatedly refused or deflected instead of actually answering them. |
 
 Keep the default `Call Summary`, `Call Successful`, and `User Sentiment`
 fields too — the backend stores those alongside the custom ones.
+
+`call_outcome` drives which bucket table a call lands in (see "Call buckets"
+above), together with `emergency_flagged`. If `call_outcome` isn't
+configured yet, the backend falls back to a heuristic: complete core fields
+→ `cases`, otherwise → `partial_calls`. Configuring `call_outcome` is what
+lets `unwanted_calls` and `spam_calls` get populated at all.
 
 ## Signature verification
 

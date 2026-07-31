@@ -21,3 +21,11 @@ export const STATUS_LABELS = {
   contacted: "Contacted",
   closed: "Closed",
 };
+
+export const BUCKETS = [
+  { key: "cases", label: "Full Cases", description: "Calls where the caller completed intake" },
+  { key: "partial-calls", label: "Partial Calls", description: "Calls that disconnected before intake finished" },
+  { key: "unwanted-calls", label: "Unwanted Calls", description: "Nonsensical, prank, or unusable calls" },
+  { key: "spam-calls", label: "Spam Calls", description: "Caller wouldn't answer the actual intake questions" },
+  { key: "emergency-flags", label: "Emergency Flags", description: "Calls where the 911/safety branch fired" },
+];

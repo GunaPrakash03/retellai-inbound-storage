@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import CaseList from "./components/CaseList";
 import CaseDetail from "./components/CaseDetail";
-import { listCases } from "./api";
+import { listRecords } from "./api";
+import { BUCKETS } from "./constants";
 
 export default function App() {
+  const [bucket, setBucket] = useState(BUCKETS[0].key);
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,14 +15,14 @@ export default function App() {
 
   const refresh = useCallback(() => {
     setLoading(true);
-    listCases({ category: categoryFilter, status: statusFilter })
+    listRecords(bucket, { category: categoryFilter, status: statusFilter })
       .then((data) => {
         setCases(data);
         setError(null);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [categoryFilter, statusFilter]);
+  }, [bucket, categoryFilter, statusFilter]);
 
   useEffect(() => {
     refresh();
@@ -28,12 +30,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, [refresh]);
 
+  function handleBucketChange(key) {
+    setBucket(key);
+    setSelectedCallId(null);
+  }
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>Case Intake</h1>
         <span className="subtitle">Calls captured by the Retell voice agent</span>
       </header>
+
+      <nav className="bucket-nav">
+        {BUCKETS.map((b) => (
+          <button
+            key={b.key}
+            className={b.key === bucket ? "active" : ""}
+            title={b.description}
+            onClick={() => handleBucketChange(b.key)}
+          >
+            {b.label}
+          </button>
+        ))}
+      </nav>
 
       {error && <div className="error-banner">Couldn't reach the backend: {error}</div>}
 
@@ -48,7 +68,7 @@ export default function App() {
           onCategoryChange={setCategoryFilter}
           onStatusChange={setStatusFilter}
         />
-        <CaseDetail callId={selectedCallId} onStatusChanged={refresh} />
+        <CaseDetail bucket={bucket} callId={selectedCallId} onStatusChanged={refresh} />
       </div>
     </div>
   );

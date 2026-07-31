@@ -7,7 +7,7 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .db import get_case, list_cases, update_status
+from .db import get_case, get_record, list_cases, list_records, update_record_status, update_status
 from .schemas import StatusUpdate
 from .webhooks import _last_attempt, router as webhook_router
 
@@ -56,7 +56,9 @@ def debug_seed():
         "case_category": "personal_injury",
         "caller_name": "Test Caller",
         "callback_phone": "+15555550123",
+        "is_phone_valid": 1,
         "email": "test@example.com",
+        "is_email_valid": 1,
         "incident_date": "2026-07-28",
         "location": "Austin, TX",
         "opposing_party": "Other driver",
@@ -91,3 +93,44 @@ def patch_case_status(call_id: str, body: StatusUpdate):
         raise HTTPException(status_code=404, detail="Case not found")
     update_status(call_id, body.status)
     return get_case(call_id)
+
+
+# Other call buckets, keyed by URL-friendly name -> table name. "cases" keeps
+# its own dedicated routes above for backward compatibility. These generic
+# routes are declared last so they never shadow a literal path above them.
+BUCKET_TABLES = {
+    "partial-calls": "partial_calls",
+    "unwanted-calls": "unwanted_calls",
+    "spam-calls": "spam_calls",
+    "emergency-flags": "emergency_flags",
+}
+
+
+def _bucket_table(bucket: str) -> str:
+    table = BUCKET_TABLES.get(bucket)
+    if not table:
+        raise HTTPException(status_code=404, detail="Unknown call bucket")
+    return table
+
+
+@app.get("/{bucket}")
+def get_bucket_records(bucket: str, limit: int = 50, category: str | None = None, status: str | None = None):
+    return list_records(_bucket_table(bucket), limit=limit, category=category, status=status)
+
+
+@app.get("/{bucket}/{call_id}")
+def get_bucket_record_detail(bucket: str, call_id: str):
+    row = get_record(_bucket_table(bucket), call_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return row
+
+
+@app.patch("/{bucket}/{call_id}")
+def patch_bucket_record_status(bucket: str, call_id: str, body: StatusUpdate):
+    table = _bucket_table(bucket)
+    row = get_record(table, call_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Record not found")
+    update_record_status(table, call_id, body.status)
+    return get_record(table, call_id)

@@ -14,9 +14,15 @@ export function getCounts() {
   return request("/counts");
 }
 
-export function listRecords(bucket, { category, status } = {}) {
+export function getCategoryCounts() {
+  return request("/category-counts");
+}
+
+export function listRecords(bucket, { category, status, subcategory, assignedTo } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);
+  if (subcategory) params.set("subcategory", subcategory);
+  if (assignedTo) params.set("assigned_to", assignedTo);
   if (status) params.set("status", status);
   const qs = params.toString();
   return request(`/${bucket}${qs ? `?${qs}` : ""}`);

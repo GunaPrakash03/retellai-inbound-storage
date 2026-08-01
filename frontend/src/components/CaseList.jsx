@@ -1,6 +1,20 @@
-import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS, SUBCATEGORY_LABELS } from "../constants";
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  STATUSES,
+  STATUS_LABELS,
+  SUBCATEGORIES,
+  SUBCATEGORY_LABELS,
+} from "../constants";
 import { timeAgo } from "../format";
 
+// Two shapes:
+//  - default (a bucket like Emergency/Partial): category + status filters,
+//    the general-purpose columns.
+//  - categoryMode (drilled into one practice area from the home page): the
+//    category is fixed, so instead we filter by subcategory and assigned
+//    attorney, and the columns show subcategory, attorney, and hearing date
+//    — the things staff sort a practice area's caseload by.
 export default function CaseList({
   cases,
   loading,
@@ -10,24 +24,57 @@ export default function CaseList({
   statusFilter,
   onCategoryChange,
   onStatusChange,
+  categoryMode = false,
+  activeCategory,
+  staff = [],
+  subcategoryFilter,
+  assignedFilter,
+  onSubcategoryChange,
+  onAssignedChange,
 }) {
+  const subcategoryOptions = SUBCATEGORIES[activeCategory] || [];
+  const assignableStaff = staff.filter((s) => s.active);
+
   return (
     <div className="case-list">
       <div className="filters">
-        <select value={categoryFilter} onChange={(e) => onCategoryChange(e.target.value)}>
-          <option value="">All categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        {categoryMode ? (
+          <>
+            {subcategoryOptions.length > 0 && (
+              <select
+                value={subcategoryFilter}
+                onChange={(e) => onSubcategoryChange(e.target.value)}
+                aria-label="Filter by matter type"
+              >
+                <option value="">All matter types</option>
+                {subcategoryOptions.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={assignedFilter}
+              onChange={(e) => onAssignedChange(e.target.value)}
+              aria-label="Filter by assigned attorney"
+            >
+              <option value="">All attorneys</option>
+              {assignableStaff.map((s) => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <select value={categoryFilter} onChange={(e) => onCategoryChange(e.target.value)}>
+            <option value="">All categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        )}
         <select value={statusFilter} onChange={(e) => onStatusChange(e.target.value)}>
           <option value="">All statuses</option>
           {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
           ))}
         </select>
       </div>
@@ -40,15 +87,26 @@ export default function CaseList({
         ) : (
           <table>
             <thead>
-              <tr>
-                <th>Case #</th>
-                <th>Category</th>
-                <th>Caller</th>
-                <th>Summary</th>
-                <th>Assigned</th>
-                <th>Status</th>
-                <th>Received</th>
-              </tr>
+              {categoryMode ? (
+                <tr>
+                  <th>Case #</th>
+                  <th>Matter type</th>
+                  <th>Caller</th>
+                  <th>Attorney</th>
+                  <th>Hearing</th>
+                  <th>Status</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>Case #</th>
+                  <th>Category</th>
+                  <th>Caller</th>
+                  <th>Summary</th>
+                  <th>Assigned</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                </tr>
+              )}
             </thead>
             <tbody>
               {cases.map((c) => (
@@ -58,19 +116,29 @@ export default function CaseList({
                   onClick={() => onSelect(c.call_id)}
                 >
                   <td className="case-number">{c.case_number || "—"}</td>
-                  <td>
-                    <span className={`badge cat-${c.case_category || "other"}`}>
-                      {CATEGORY_LABELS[c.case_category] || "Uncategorized"}
-                    </span>
-                    {c.case_subcategory && (
-                      <div className="subcategory-line">
-                        {SUBCATEGORY_LABELS[c.case_subcategory] || c.case_subcategory}
-                      </div>
-                    )}
-                    {!!c.emergency_flagged && (
-                      <span className="flag" title="Safety branch was triggered on this call">⚠</span>
-                    )}
-                  </td>
+
+                  {categoryMode ? (
+                    <td>
+                      {c.case_subcategory
+                        ? SUBCATEGORY_LABELS[c.case_subcategory] || c.case_subcategory
+                        : "—"}
+                    </td>
+                  ) : (
+                    <td>
+                      <span className={`badge cat-${c.case_category || "other"}`}>
+                        {CATEGORY_LABELS[c.case_category] || "Uncategorized"}
+                      </span>
+                      {c.case_subcategory && (
+                        <div className="subcategory-line">
+                          {SUBCATEGORY_LABELS[c.case_subcategory] || c.case_subcategory}
+                        </div>
+                      )}
+                      {!!c.emergency_flagged && (
+                        <span className="flag" title="Safety branch was triggered on this call">⚠</span>
+                      )}
+                    </td>
+                  )}
+
                   <td>
                     <div className="caller-name">{c.caller_name || "Unknown"}</div>
                     <div className="caller-phone">
@@ -80,14 +148,26 @@ export default function CaseList({
                       )}
                     </div>
                   </td>
-                  <td className="summary-cell">{c.case_summary || "—"}</td>
-                  <td className="nowrap">{c.assigned_to || "—"}</td>
+
+                  {categoryMode ? (
+                    <>
+                      <td className="nowrap">{c.assigned_to || "—"}</td>
+                      <td className="nowrap">{c.next_hearing_date || "—"}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="summary-cell">{c.case_summary || "—"}</td>
+                      <td className="nowrap">{c.assigned_to || "—"}</td>
+                    </>
+                  )}
+
                   <td>
                     <span className={`pill status-${c.status}`}>
                       {STATUS_LABELS[c.status] || c.status}
                     </span>
                   </td>
-                  <td className="nowrap">{timeAgo(c.created_at)}</td>
+
+                  {!categoryMode && <td className="nowrap">{timeAgo(c.created_at)}</td>}
                 </tr>
               ))}
             </tbody>

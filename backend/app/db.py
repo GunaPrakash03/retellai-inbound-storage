@@ -269,13 +269,26 @@ def upsert_record(table: str, row: dict) -> None:
     _conn.commit()
 
 
-def list_records(table: str, limit: int = 50, category: str | None = None, status: str | None = None) -> list[dict]:
+def list_records(
+    table: str,
+    limit: int = 50,
+    category: str | None = None,
+    status: str | None = None,
+    subcategory: str | None = None,
+    assigned_to: str | None = None,
+) -> list[dict]:
     _check_bucket(table)
     query = f"SELECT * FROM {table} WHERE 1=1"
     params: dict = {}
     if category:
         query += " AND case_category = :category"
         params["category"] = category
+    if subcategory:
+        query += " AND case_subcategory = :subcategory"
+        params["subcategory"] = subcategory
+    if assigned_to:
+        query += " AND assigned_to = :assigned_to"
+        params["assigned_to"] = assigned_to
     if status:
         query += " AND status = :status"
         params["status"] = status
@@ -284,6 +297,16 @@ def list_records(table: str, limit: int = 50, category: str | None = None, statu
 
     rows = _conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
+
+
+def count_cases_by_category() -> dict[str, int]:
+    """How many completed cases sit under each category, for the home page's
+    category list. Only the `cases` bucket — the other buckets aren't sorted
+    by legal category."""
+    rows = _conn.execute(
+        "SELECT case_category AS c, COUNT(*) AS n FROM cases GROUP BY case_category"
+    ).fetchall()
+    return {(r["c"] or "other"): r["n"] for r in rows}
 
 
 def get_record(table: str, call_id: str) -> dict | None:
@@ -603,8 +626,17 @@ def upsert_case(row: dict) -> None:
     upsert_record("cases", row)
 
 
-def list_cases(limit: int = 50, category: str | None = None, status: str | None = None) -> list[dict]:
-    return list_records("cases", limit=limit, category=category, status=status)
+def list_cases(
+    limit: int = 50,
+    category: str | None = None,
+    status: str | None = None,
+    subcategory: str | None = None,
+    assigned_to: str | None = None,
+) -> list[dict]:
+    return list_records(
+        "cases", limit=limit, category=category, status=status,
+        subcategory=subcategory, assigned_to=assigned_to,
+    )
 
 
 def get_case(call_id: str) -> dict | None:

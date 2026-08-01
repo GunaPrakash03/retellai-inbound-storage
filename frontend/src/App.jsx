@@ -1,39 +1,69 @@
 import { useCallback, useEffect, useState } from "react";
 import CaseList from "./components/CaseList";
 import CaseDetail from "./components/CaseDetail";
+import CategoryOverview from "./components/CategoryOverview";
 import MessagesView from "./components/MessagesView";
 import Sidebar from "./components/Sidebar";
 import StaffView from "./components/StaffView";
-import { getCounts, listRecords } from "./api";
-import { BUCKETS, FIRM_NAME, VIEWS } from "./constants";
+import { getCategoryCounts, getCounts, listRecords, listStaff } from "./api";
+import { BUCKETS, CATEGORY_LABELS, FIRM_NAME, VIEWS } from "./constants";
+
+const CASES_BUCKET = "cases";
 
 export default function App() {
   const [bucket, setBucket] = useState(BUCKETS[0].key);
   const [view, setView] = useState(null); // null = showing a call bucket
   const [cases, setCases] = useState([]);
   const [counts, setCounts] = useState(null);
+  const [categoryCounts, setCategoryCounts] = useState(null);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCallId, setSelectedCallId] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  // Which practice area is open within the Cases section. null = the
+  // category overview (the home page); a value = that category's case list.
+  const [caseCategory, setCaseCategory] = useState(null);
+  const [subcategoryFilter, setSubcategoryFilter] = useState("");
+  const [assignedFilter, setAssignedFilter] = useState("");
+
+  // On the Cases home page: no category picked yet, so show the overview.
+  const onCategoryHome = bucket === CASES_BUCKET && view === null && caseCategory === null;
 
   const refreshCounts = useCallback(() => {
     getCounts().then(setCounts).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    listStaff().then(setStaff).catch(() => setStaff([]));
+  }, []);
+
   const refresh = useCallback(() => {
     refreshCounts();
     if (view !== null) return;
+
+    if (onCategoryHome) {
+      getCategoryCounts().then(setCategoryCounts).catch(() => {});
+      return;
+    }
+
     setLoading(true);
-    listRecords(bucket, { category: categoryFilter, status: statusFilter })
+    const filters =
+      bucket === CASES_BUCKET
+        ? { category: caseCategory, subcategory: subcategoryFilter, assignedTo: assignedFilter, status: statusFilter }
+        : { category: categoryFilter, status: statusFilter };
+    listRecords(bucket, filters)
       .then((data) => {
         setCases(data);
         setError(null);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [bucket, view, categoryFilter, statusFilter, refreshCounts]);
+  }, [
+    bucket, view, onCategoryHome, caseCategory, subcategoryFilter,
+    assignedFilter, categoryFilter, statusFilter, refreshCounts,
+  ]);
 
   useEffect(() => {
     refresh();
@@ -45,6 +75,11 @@ export default function App() {
     setBucket(key);
     setView(null);
     setSelectedCallId(null);
+    setCaseCategory(null);
+    setCategoryFilter("");
+    setSubcategoryFilter("");
+    setStatusFilter("");
+    setAssignedFilter("");
   }
 
   function selectView(nextView) {
@@ -52,7 +87,21 @@ export default function App() {
     setSelectedCallId(null);
   }
 
+  function openCategory(category) {
+    setCaseCategory(category);
+    setSelectedCallId(null);
+    setSubcategoryFilter("");
+    setAssignedFilter("");
+    setStatusFilter("");
+  }
+
+  function backToCategories() {
+    setCaseCategory(null);
+    setSelectedCallId(null);
+  }
+
   const activeBucket = BUCKETS.find((b) => b.key === bucket);
+  const isCasesSection = bucket === CASES_BUCKET;
 
   return (
     <div className="app">
@@ -81,11 +130,29 @@ export default function App() {
             <MessagesView onChanged={refreshCounts} />
           ) : view === VIEWS.STAFF ? (
             <StaffView />
+          ) : onCategoryHome ? (
+            <CategoryOverview
+              counts={categoryCounts}
+              loading={categoryCounts === null}
+              onSelect={openCategory}
+            />
           ) : (
             <div className="bucket-view">
               <div className="bucket-intro">
-                <h2>{activeBucket?.label}</h2>
-                <p className="panel-note">{activeBucket?.description}</p>
+                {isCasesSection ? (
+                  <>
+                    <button className="category-back" onClick={backToCategories}>
+                      ← All practice areas
+                    </button>
+                    <h2>{CATEGORY_LABELS[caseCategory] || "Cases"}</h2>
+                    <p className="panel-note">Completed intakes in this practice area</p>
+                  </>
+                ) : (
+                  <>
+                    <h2>{activeBucket?.label}</h2>
+                    <p className="panel-note">{activeBucket?.description}</p>
+                  </>
+                )}
               </div>
               <div className="split">
                 <CaseList
@@ -97,6 +164,13 @@ export default function App() {
                   statusFilter={statusFilter}
                   onCategoryChange={setCategoryFilter}
                   onStatusChange={setStatusFilter}
+                  categoryMode={isCasesSection}
+                  activeCategory={caseCategory}
+                  staff={staff}
+                  subcategoryFilter={subcategoryFilter}
+                  assignedFilter={assignedFilter}
+                  onSubcategoryChange={setSubcategoryFilter}
+                  onAssignedChange={setAssignedFilter}
                 />
                 <CaseDetail bucket={bucket} callId={selectedCallId} onChanged={refresh} />
               </div>

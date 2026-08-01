@@ -268,6 +268,102 @@ body {
   min-height: 0;
 }
 
+/* ---- home page: practice-area category list ---- */
+
+.category-overview {
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+.category-grid {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.category-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: inherit;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s, transform 0.06s;
+}
+
+.category-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.category-card:active { transform: translateY(1px); }
+
+.category-swatch {
+  flex: none;
+  width: 12px;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.category-name {
+  flex: 1;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.category-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  min-width: 28px;
+  padding: 2px 9px;
+  text-align: center;
+}
+
+.category-count.zero {
+  color: var(--ink-soft);
+  background: var(--bg);
+  font-weight: 500;
+}
+
+.category-swatch.cat-personal_injury { background: var(--cat-1); }
+.category-swatch.cat-workplace_employment { background: var(--cat-2); }
+.category-swatch.cat-medical_product { background: var(--cat-3); }
+.category-swatch.cat-family_law { background: var(--cat-4); }
+.category-swatch.cat-criminal_defense { background: var(--cat-5); }
+.category-swatch.cat-immigration { background: var(--cat-6); }
+.category-swatch.cat-real_estate_housing { background: var(--cat-7); }
+.category-swatch.cat-business_contract { background: var(--cat-8); }
+.category-swatch.cat-estate_disability { background: var(--cat-9); }
+.category-swatch.cat-other { background: var(--cat-10); }
+
+/* back link from a category's case list to the practice-area list */
+.category-back {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 6px;
+}
+.category-back:hover { text-decoration: underline; }
+
 .case-list,
 .case-detail {
   background: var(--panel);

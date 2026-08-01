@@ -53,8 +53,23 @@ def get_counts():
 
 
 @app.get("/cases")
-def get_cases(limit: int = 50, category: str | None = None, status: str | None = None):
-    return list_cases(limit=limit, category=category, status=status)
+def get_cases(
+    limit: int = 50,
+    category: str | None = None,
+    status: str | None = None,
+    subcategory: str | None = None,
+    assigned_to: str | None = None,
+):
+    return list_cases(
+        limit=limit, category=category, status=status,
+        subcategory=subcategory, assigned_to=assigned_to,
+    )
+
+
+@app.get("/category-counts")
+def get_category_counts():
+    """Case count per legal category, for the home page's category list."""
+    return db.count_cases_by_category()
 
 
 # The /debug routes exist only when DEBUG_ENDPOINTS=1 is set. They are
@@ -357,8 +372,18 @@ def _bucket_table(bucket: str) -> str:
 
 
 @app.get("/{bucket}")
-def get_bucket_records(bucket: str, limit: int = 50, category: str | None = None, status: str | None = None):
-    return list_records(_bucket_table(bucket), limit=limit, category=category, status=status)
+def get_bucket_records(
+    bucket: str,
+    limit: int = 50,
+    category: str | None = None,
+    status: str | None = None,
+    subcategory: str | None = None,
+    assigned_to: str | None = None,
+):
+    return list_records(
+        _bucket_table(bucket), limit=limit, category=category, status=status,
+        subcategory=subcategory, assigned_to=assigned_to,
+    )
 
 
 @app.get("/{bucket}/{call_id}")

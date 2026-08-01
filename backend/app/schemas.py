@@ -15,6 +15,7 @@ class AssignmentUpdate(BaseModel):
 class CourtStatusUpdate(BaseModel):
     court_status: str | None = None
     next_hearing_date: str | None = None
+    hearing_attorney: str | None = None
 
 
 class RecordFieldsUpdate(BaseModel):
@@ -30,6 +31,7 @@ class RecordFieldsUpdate(BaseModel):
     email: str | None = None
     from_number: str | None = None
     case_category: str | None = None
+    case_subcategory: str | None = None
     incident_date: str | None = None
     location: str | None = None
     opposing_party: str | None = None

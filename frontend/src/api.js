@@ -50,12 +50,13 @@ export function updateAssignment(bucket, callId, assignedTo) {
   });
 }
 
-export function updateCourtStatus(bucket, callId, { courtStatus, nextHearingDate }) {
+export function updateCourtStatus(bucket, callId, { courtStatus, nextHearingDate, hearingAttorney }) {
   return request(`/${bucket}/${encodeURIComponent(callId)}/court-status`, {
     method: "PATCH",
     body: JSON.stringify({
       court_status: courtStatus || null,
       next_hearing_date: nextHearingDate || null,
+      hearing_attorney: hearingAttorney || null,
     }),
   });
 }

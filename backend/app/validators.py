@@ -17,14 +17,113 @@ VALID_CATEGORIES = {
 }
 
 
+# Finer-grained matter types within each category. Keyed by category, and
+# kept in step with the matter types the agent prompt's Step 1 / Step 3
+# already ask about — the extraction can only reliably pick values the
+# agent actually asked the questions to distinguish. "other" has no list:
+# by definition it holds what didn't fit a taxonomy.
+VALID_SUBCATEGORIES = {
+    "personal_injury": {
+        "car_accident",
+        "motorcycle_accident",
+        "truck_accident",
+        "pedestrian_bicycle_accident",
+        "slip_and_fall",
+        "dog_bite",
+        "wrongful_death",
+        "boating_accident",
+    },
+    "workplace_employment": {
+        "workplace_injury_workers_comp",
+        "wrongful_termination",
+        "discrimination",
+        "harassment",
+        "wage_and_hour",
+    },
+    "medical_product": {
+        "medical_malpractice",
+        "defective_product",
+        "dangerous_drug_device",
+    },
+    "family_law": {
+        "divorce",
+        "child_custody_visitation",
+        "child_support",
+        "paternity",
+        "adoption_guardianship",
+        "domestic_violence_protection",
+        "emancipation_name_changes",
+    },
+    "criminal_defense": {
+        "dui_dwi",
+        "misdemeanor",
+        "felony",
+        "traffic_violation",
+        "juvenile",
+    },
+    "immigration": {
+        "visa",
+        "green_card",
+        "deportation_removal",
+        "asylum",
+        "citizenship_naturalization",
+    },
+    "real_estate_housing": {
+        "landlord_tenant",
+        "eviction",
+        "purchase_sale_dispute",
+        "foreclosure",
+    },
+    "business_contract": {
+        "breach_of_contract",
+        "partnership_dispute",
+        "debt_collection",
+    },
+    "estate_disability": {
+        "estate_planning",
+        "probate",
+        "social_security_disability",
+        "veterans_benefits",
+    },
+}
+
+
+# Dropped when slugifying, so the human-readable label and the stored value
+# collapse to the same thing: "Child Custody and Visitation" and
+# "child_custody_visitation" both become "child_custody_visitation".
+_SLUG_STOPWORDS = {"and", "or", "of", "the", "a", "an"}
+
+
+def _clean_slug(value: str) -> str:
+    """Collapse a label to the snake_case form the lists use, dropping filler
+    words — "Family Law," -> "family_law", "Adoption and Guardianship" ->
+    "adoption_guardianship"."""
+    tokens = re.split(r"[^a-z0-9]+", value.lower())
+    kept = [t for t in tokens if t and t not in _SLUG_STOPWORDS]
+    return "_".join(kept)
+
+
 def normalize_category(category: str | None) -> str | None:
     """Retell's Selector extraction occasionally tacks on stray punctuation
-    (e.g. "personal_injury,") which then fails to match the fixed category
-    list used for display. Strip it back down to the clean value."""
+    ("personal_injury,") or reformats the label ("Family Law"). Collapse to
+    the canonical value; anything still unrecognized becomes "other" rather
+    than being stored raw, where it would render as Uncategorized and never
+    match the dashboard's category filter."""
     if not category:
         return category
-    cleaned = category.strip().strip(",.;: ").lower()
-    return cleaned if cleaned in VALID_CATEGORIES else cleaned or category
+    cleaned = _clean_slug(category)
+    return cleaned if cleaned in VALID_CATEGORIES else "other"
+
+
+def normalize_subcategory(subcategory: str | None, category: str | None) -> str | None:
+    """Valid subcategory for the given category, or None. Unlike categories
+    there is no catch-all to fall back to — a subcategory that doesn't match
+    the list is dropped, since a wrong specific label ("divorce" on a
+    custody matter) is worse than none."""
+    if not subcategory:
+        return None
+    cleaned = _clean_slug(subcategory)
+    return cleaned if cleaned in VALID_SUBCATEGORIES.get(category or "", ()) else None
 
 
 def is_valid_phone(phone: str | None) -> bool | None:

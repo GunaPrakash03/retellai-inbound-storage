@@ -59,6 +59,7 @@ _BUCKET_ROWS: list[tuple[str, dict]] = [
         call_id="seed-case-002",
         from_number="+15125553402",
         case_category="family_law",
+        case_subcategory="child_custody_visitation",
         caller_name="James Okafor",
         callback_phone="+15125553402",
         is_phone_valid=1,
@@ -199,11 +200,14 @@ _STAFF = [
 # (bucket, call_id, assigned_to, court_status, next_hearing_date) — one case
 # gets a hearing date, one gets a status with no date, one stays untouched so
 # the "no status on file" path is testable.
+# (bucket, call_id, assigned_to, court_status, next_hearing_date,
+#  hearing_attorney). The custody case has a hearing with a covering
+# attorney who isn't the one it's assigned to, exercising that split.
 _HANDLING = [
     ("cases", "seed-case-001", "Dana Cole",
-     "Demand letter sent; awaiting insurer response", None),
+     "Demand letter sent; awaiting insurer response", None, None),
     ("cases", "seed-case-002", "Marcus Webb",
-     "Status conference scheduled", "2026-08-28"),
+     "Status conference scheduled", "2026-08-28", "Priya Natarajan"),
 ]
 
 
@@ -224,10 +228,10 @@ def seed_all() -> dict:
             staff_created += 1
     staff_by_name = {s["name"]: s for s in db.list_staff()}
 
-    for bucket, call_id, assigned_to, court_status, hearing in _HANDLING:
+    for bucket, call_id, assigned_to, court_status, hearing, hearing_attorney in _HANDLING:
         db.set_case_assignment(bucket, call_id, assigned_to)
-        if court_status or hearing:
-            db.set_court_status(bucket, call_id, court_status, hearing)
+        if court_status or hearing or hearing_attorney:
+            db.set_court_status(bucket, call_id, court_status, hearing, hearing_attorney)
 
     messages_created = 0
     if not db.list_messages(limit=1):

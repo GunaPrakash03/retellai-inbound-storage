@@ -7,7 +7,14 @@ import {
   updateRecordFields,
   updateRecordStatus,
 } from "../api";
-import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  STATUSES,
+  STATUS_LABELS,
+  SUBCATEGORIES,
+  SUBCATEGORY_LABELS,
+} from "../constants";
 import { daysSince, timeAgo } from "../format";
 
 // `type` drives which input the edit form renders. Order matches the
@@ -58,7 +65,11 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [courtDraft, setCourtDraft] = useState({ courtStatus: "", nextHearingDate: "" });
+  const [courtDraft, setCourtDraft] = useState({
+    courtStatus: "",
+    nextHearingDate: "",
+    hearingAttorney: "",
+  });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saveError, setSaveError] = useState(null);
@@ -89,6 +100,7 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
         setCourtDraft({
           courtStatus: data.court_status || "",
           nextHearingDate: data.next_hearing_date || "",
+          hearingAttorney: data.hearing_attorney || "",
         });
       })
       .catch((e) => {
@@ -126,7 +138,11 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
   }
 
   function startEditing() {
-    const seed = { case_category: caseData.case_category || "", case_summary: caseData.case_summary || "" };
+    const seed = {
+      case_category: caseData.case_category || "",
+      case_subcategory: caseData.case_subcategory || "",
+      case_summary: caseData.case_summary || "",
+    };
     for (const [key, , type] of FIELD_ROWS) {
       seed[key] = type === "bool" ? !!caseData[key] : caseData[key] ?? "";
     }
@@ -181,6 +197,11 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
             <span className={`badge cat-${caseData.case_category || "other"}`}>
               {CATEGORY_LABELS[caseData.case_category] || "Uncategorized"}
             </span>
+            {caseData.case_subcategory && (
+              <span className="subcategory-badge">
+                {SUBCATEGORY_LABELS[caseData.case_subcategory] || caseData.case_subcategory}
+              </span>
+            )}
             {!!caseData.emergency_flagged && (
               <span className="flag" title="Safety branch was triggered on this call">
                 ⚠ Safety branch triggered
@@ -254,6 +275,24 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
             onChange={(e) => setCourtDraft({ ...courtDraft, nextHearingDate: e.target.value })}
           />
         </label>
+        <label className="inline-field">
+          <span className="field-label">Hearing attorney</span>
+          {/* Who appears at the hearing — not always the assigned attorney,
+              since court coverage gets handed off. Free text so it can hold
+              someone outside the staff directory (covering counsel). */}
+          <input
+            value={courtDraft.hearingAttorney}
+            disabled={saving}
+            placeholder="Who's appearing"
+            list="hearing-attorney-options"
+            onChange={(e) => setCourtDraft({ ...courtDraft, hearingAttorney: e.target.value })}
+          />
+          <datalist id="hearing-attorney-options">
+            {staff.filter((s) => s.active).map((s) => (
+              <option key={s.id} value={s.name} />
+            ))}
+          </datalist>
+        </label>
         <div className="inline-actions">
           <button
             disabled={saving}
@@ -261,6 +300,11 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
           >
             {saving ? "Saving…" : "Save court status"}
           </button>
+          {caseData.hearing_attorney && (
+            <span className="panel-note">
+              Appearing: <strong>{caseData.hearing_attorney}</strong>
+            </span>
+          )}
           {caseData.court_status_updated && (
             <span className="panel-note">
               Updated {timeAgo(caseData.court_status_updated)}
@@ -285,7 +329,12 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
             <select
               value={draft.case_category}
               disabled={saving}
-              onChange={(e) => setDraft({ ...draft, case_category: e.target.value })}
+              onChange={(e) =>
+                // Changing category clears a now-mismatched subcategory in
+                // the form; the backend does the same on save, this just
+                // keeps the dropdown from showing a stale choice meanwhile.
+                setDraft({ ...draft, case_category: e.target.value, case_subcategory: "" })
+              }
             >
               <option value="">Uncategorized</option>
               {CATEGORIES.map((c) => (
@@ -293,6 +342,22 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
               ))}
             </select>
           </div>
+
+          {(SUBCATEGORIES[draft.case_category] || []).length > 0 && (
+            <div className="field-row">
+              <span className="field-label">Matter type</span>
+              <select
+                value={draft.case_subcategory}
+                disabled={saving}
+                onChange={(e) => setDraft({ ...draft, case_subcategory: e.target.value })}
+              >
+                <option value="">Not specified</option>
+                {SUBCATEGORIES[draft.case_category].map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {FIELD_ROWS.map(([key, label, type]) => (
             <div className="field-row" key={key}>

@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
+import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS, SUBCATEGORY_LABELS } from "../constants";
 import { timeAgo } from "../format";
 
 export default function CaseList({
@@ -62,6 +62,11 @@ export default function CaseList({
                     <span className={`badge cat-${c.case_category || "other"}`}>
                       {CATEGORY_LABELS[c.case_category] || "Uncategorized"}
                     </span>
+                    {c.case_subcategory && (
+                      <div className="subcategory-line">
+                        {SUBCATEGORY_LABELS[c.case_subcategory] || c.case_subcategory}
+                      </div>
+                    )}
                     {!!c.emergency_flagged && (
                       <span className="flag" title="Safety branch was triggered on this call">⚠</span>
                     )}

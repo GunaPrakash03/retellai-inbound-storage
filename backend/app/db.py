@@ -5,7 +5,7 @@ import sqlite3
 import uuid
 from pathlib import Path
 
-from .validators import is_valid_email, is_valid_phone, normalize_category
+from .validators import is_valid_email, is_valid_phone, normalize_category, normalize_subcategory
 
 DB_PATH = os.getenv("DB_PATH", "./data/cases.db")
 Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -32,8 +32,10 @@ CREATE TABLE IF NOT EXISTS {table} (
     assigned_to           TEXT,
     court_status          TEXT,
     next_hearing_date     TEXT,
+    hearing_attorney      TEXT,
     court_status_updated  TEXT,
     case_category         TEXT,
+    case_subcategory      TEXT,
     caller_name           TEXT,
     callback_phone        TEXT,
     is_phone_valid        INTEGER,
@@ -153,6 +155,8 @@ _NEW_COLUMNS = [
     ("next_hearing_date", "TEXT"),
     ("court_status_updated", "TEXT"),
     ("manual_edits", "TEXT"),
+    ("case_subcategory", "TEXT"),
+    ("hearing_attorney", "TEXT"),
 ]
 for _table in BUCKETS:
     _existing = {row["name"] for row in _conn.execute(f"PRAGMA table_info({_table})")}
@@ -168,11 +172,13 @@ _conn.commit()
 # Columns the webhook owns and refreshes on every delivery. Deliberately
 # excludes case_number (allocated once, and the caller may have written it
 # down) and the staff-owned fields assigned_to / court_status /
-# next_hearing_date / court_status_updated — a redelivered webhook must not
-# wipe an attorney assignment or a hearing date entered by a human.
+# next_hearing_date / hearing_attorney / court_status_updated — a
+# redelivered webhook must not wipe an attorney assignment or a hearing date
+# entered by a human.
 _UPDATABLE_COLUMNS = [
     "from_number",
     "case_category",
+    "case_subcategory",
     "caller_name",
     "callback_phone",
     "is_phone_valid",
@@ -332,6 +338,7 @@ EDITABLE_COLUMNS = [
     "email",
     "from_number",
     "case_category",
+    "case_subcategory",
     "incident_date",
     "location",
     "opposing_party",
@@ -373,14 +380,28 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
     the "invalid" warning the old one earned.
     """
     _check_bucket(table)
+    current = get_record(table, call_id)
     updates = {k: v for k, v in fields.items() if k in EDITABLE_COLUMNS}
     if not updates:
-        return get_record(table, call_id)
+        return current
 
     for col in _BOOL_COLUMNS & updates.keys():
         updates[col] = None if updates[col] is None else int(bool(updates[col]))
     if "case_category" in updates:
         updates["case_category"] = normalize_category(updates["case_category"])
+    # A subcategory only makes sense under its category, so validate it
+    # against the category this edit lands on — the new one if the same edit
+    # changes it, otherwise the stored one. Recategorizing a case without
+    # touching the subcategory can strand a now-mismatched value (a divorce
+    # subcategory under criminal_defense); clear it in that case.
+    effective_category = updates.get("case_category", (current or {}).get("case_category"))
+    if "case_subcategory" in updates:
+        updates["case_subcategory"] = normalize_subcategory(
+            updates["case_subcategory"], effective_category
+        )
+    elif "case_category" in updates and (current or {}).get("case_subcategory"):
+        if normalize_subcategory(current["case_subcategory"], effective_category) is None:
+            updates["case_subcategory"] = None
     if "callback_phone" in updates:
         valid = is_valid_phone(updates["callback_phone"])
         updates["is_phone_valid"] = None if valid is None else int(valid)
@@ -414,20 +435,26 @@ def set_court_status(
     call_id: str,
     court_status: str | None,
     next_hearing_date: str | None,
+    hearing_attorney: str | None = None,
 ) -> None:
-    """Record where a case stands in court.
+    """Record where a case stands in court, and who is appearing at the next
+    hearing.
 
     Stamps court_status_updated so the agent can tell a caller how current
     the information is — reading back a hearing date without saying when it
     was last confirmed is how someone ends up at court on the wrong day.
+
+    hearing_attorney is who will actually stand up at the hearing, which
+    isn't always the attorney the case is assigned to — coverage gets
+    handed off. Kept separate from assigned_to for that reason.
     """
     _check_bucket(table)
     _conn.execute(
         f"""UPDATE {table}
-            SET court_status = :s, next_hearing_date = :d,
+            SET court_status = :s, next_hearing_date = :d, hearing_attorney = :a,
                 court_status_updated = datetime('now'), updated_at = datetime('now')
             WHERE call_id = :c""",
-        {"s": court_status, "d": next_hearing_date, "c": call_id},
+        {"s": court_status, "d": next_hearing_date, "a": hearing_attorney, "c": call_id},
     )
     _conn.commit()
 

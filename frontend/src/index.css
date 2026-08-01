@@ -345,6 +345,27 @@ tbody tr.selected {
 .badge.cat-estate_disability { background: var(--cat-9); }
 .badge.cat-other { background: var(--cat-10); }
 
+/* Matter type — a subordinate tag beside the coloured category badge in the
+   detail header, and a muted line under it in the list. */
+.subcategory-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.subcategory-line {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
 .flag {
   margin-left: 6px;
   color: #b45309;

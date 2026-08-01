@@ -402,5 +402,7 @@ def patch_court_status(bucket: str, call_id: str, body: CourtStatusUpdate):
     table = _any_bucket_table(bucket)
     if not get_record(table, call_id):
         raise HTTPException(status_code=404, detail="Record not found")
-    db.set_court_status(table, call_id, body.court_status, body.next_hearing_date)
+    db.set_court_status(
+        table, call_id, body.court_status, body.next_hearing_date, body.hearing_attorney
+    )
     return get_record(table, call_id)

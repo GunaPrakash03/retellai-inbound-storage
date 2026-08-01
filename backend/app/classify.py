@@ -125,18 +125,11 @@ def _gemini(prompt: str) -> dict | None:
     return _extract_json(_post(model, api_key, plain))
 
 
-def classify_employment(
-    transcript: str | None, case_summary: str | None
-) -> tuple[str | None, str | None]:
-    """Return (case_type_slug, case_subtype_slug) for an employment call, or
-    (None, None). Both are validated against the taxonomy, so an off-list or
-    mismatched answer is dropped rather than stored."""
-    if not transcript:
-        return (None, None)
-    answer = _gemini(_prompt(transcript, case_summary))
+def _validate(answer: dict | None) -> tuple[str | None, str | None]:
+    """Turn a raw Gemini answer into a validated (case_type, subtype), dropping
+    anything below the confidence floor or off the taxonomy."""
     if not answer:
         return (None, None)
-
     try:
         confidence = float(answer.get("confidence", 0))
     except (TypeError, ValueError):
@@ -155,6 +148,34 @@ def classify_employment(
         case_type,
     )
     return (case_type, case_subtype)
+
+
+def classify_employment(
+    transcript: str | None, case_summary: str | None
+) -> tuple[str | None, str | None]:
+    """Return (case_type_slug, case_subtype_slug) for an employment call, or
+    (None, None). Both are validated against the taxonomy, so an off-list or
+    mismatched answer is dropped rather than stored."""
+    if not transcript:
+        return (None, None)
+    return _validate(_gemini(_prompt(transcript, case_summary)))
+
+
+def diagnose(transcript: str | None, case_summary: str | None) -> dict:
+    """One classification with the internals exposed — for the DEBUG endpoint.
+    Shows whether the key is set, what model ran, Gemini's raw answer, and the
+    validated result, so a live check can tell "LLM working" from "key missing"
+    or "answer dropped by validation"."""
+    key_set = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    model = os.getenv("GEMINI_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
+    raw = _gemini(_prompt(transcript, case_summary)) if (key_set and transcript) else None
+    case_type, case_subtype = _validate(raw)
+    return {
+        "gemini_key_set": key_set,
+        "model": model,
+        "raw_answer": raw,
+        "validated": {"case_subcategory": case_type, "case_subtype": case_subtype},
+    }
 
 
 def classify_and_store(table: str, call_id: str) -> None:

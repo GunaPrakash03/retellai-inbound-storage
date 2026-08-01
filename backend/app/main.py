@@ -122,6 +122,32 @@ def debug_seed(reset: bool = False):
     return seed_all(reset=reset)
 
 
+@app.post("/debug/classify/{call_id}")
+def debug_classify(call_id: str, store: bool = False):
+    """Run the Gemini taxonomy classifier on one existing case and return what
+    it saw — the key state, the model, Gemini's raw answer, and the validated
+    result — so you can confirm the LLM works end to end without a live call.
+    With ?store=1, also writes the result (respecting manual edits)."""
+    _require_debug()
+    from . import classify
+
+    row = get_case(call_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+    result = classify.diagnose(row.get("transcript"), row.get("case_summary"))
+    result["case"] = {
+        "call_id": call_id,
+        "case_category": row.get("case_category"),
+        "employment": row.get("case_category") == "workplace_employment",
+        "has_transcript": bool(row.get("transcript")),
+    }
+    if store and row.get("case_category") == "workplace_employment":
+        v = result["validated"]
+        db.set_classification("cases", call_id, v["case_subcategory"], v["case_subtype"])
+        result["stored"] = True
+    return result
+
+
 @app.post("/debug/purge")
 def debug_purge():
     """Empty the database — every call bucket, messages, and the lookup audit

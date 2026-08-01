@@ -75,14 +75,18 @@ def debug_last_webhook():
 
 
 @app.post("/debug/seed")
-def debug_seed():
-    """Populate every table — all six call buckets, staff, messages, plus
-    assignments and court statuses — with realistic sample data for testing
-    the dashboard and the case-lookup flow. Idempotent; see app/seeding.py."""
+def debug_seed(reset: bool = False):
+    """Populate every table — one completed case per legal category, one call
+    per other bucket, staff, messages, assignments, and court statuses — with
+    realistic sample data. Idempotent; see app/seeding.py.
+
+    With ?reset=1, wipes all existing call data first (every bucket, messages,
+    and the lookup audit) so only the sample set remains. The staff directory
+    is preserved. Destructive and irreversible — DEBUG-gated for that reason."""
     _require_debug()
     from .seeding import seed_all
 
-    return seed_all()
+    return seed_all(reset=reset)
 
 
 @app.get("/cases/{call_id}")

@@ -292,6 +292,22 @@ def get_record(table: str, call_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def reset_call_data() -> dict[str, int]:
+    """Delete every call record, message, and audit row — a clean slate.
+
+    Wipes all six call buckets plus messages and lookup_audit. Leaves the
+    staff directory intact: staff are people at the firm, not call data, and
+    the seeder re-asserts the standard set anyway. Irreversible; only reached
+    through the DEBUG-gated reset endpoint.
+    """
+    counts: dict[str, int] = {}
+    for table in BUCKETS + ["messages", "lookup_audit"]:
+        counts[table] = _conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"]
+        _conn.execute(f"DELETE FROM {table}")
+    _conn.commit()
+    return counts
+
+
 def update_record_status(table: str, call_id: str, status: str) -> None:
     _check_bucket(table)
     _conn.execute(

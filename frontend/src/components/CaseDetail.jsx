@@ -1,19 +1,28 @@
 import { useEffect, useState } from "react";
-import { getRecord, listStaff, updateAssignment, updateCourtStatus, updateRecordStatus } from "../api";
-import { CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
+import {
+  getRecord,
+  listStaff,
+  updateAssignment,
+  updateCourtStatus,
+  updateRecordFields,
+  updateRecordStatus,
+} from "../api";
+import { CATEGORIES, CATEGORY_LABELS, STATUSES, STATUS_LABELS } from "../constants";
 import { daysSince, timeAgo } from "../format";
 
+// `type` drives which input the edit form renders. Order matches the
+// read-only grid so a field doesn't move when you switch into edit mode.
 const FIELD_ROWS = [
-  ["caller_name", "Caller name"],
-  ["callback_phone", "Callback phone"],
-  ["email", "Email"],
-  ["incident_date", "Incident / key date"],
-  ["location", "Location"],
-  ["opposing_party", "Opposing party"],
-  ["key_date_or_deadline", "Deadline / court date"],
-  ["represented_already", "Already represented"],
-  ["injured", "Injured"],
-  ["police_report_filed", "Police report filed"],
+  ["caller_name", "Caller name", "text"],
+  ["callback_phone", "Callback phone", "text"],
+  ["email", "Email", "text"],
+  ["incident_date", "Incident / key date", "text"],
+  ["location", "Location", "text"],
+  ["opposing_party", "Opposing party", "text"],
+  ["key_date_or_deadline", "Deadline / court date", "text"],
+  ["represented_already", "Already represented", "bool"],
+  ["injured", "Injured", "bool"],
+  ["police_report_filed", "Police report filed", "bool"],
 ];
 
 const VALIDITY_KEYS = { callback_phone: "is_phone_valid", email: "is_email_valid" };
@@ -21,6 +30,19 @@ const VALIDITY_KEYS = { callback_phone: "is_phone_valid", email: "is_email_valid
 // Past this many days, a hearing date is old enough that reading it to a
 // caller without checking could send them to court on the wrong day.
 const STALE_AFTER_DAYS = 14;
+
+// Which fields staff have hand-corrected. Stored as a JSON array of column
+// names; treat anything unparseable as "none edited" rather than breaking
+// the whole detail pane over a display-only badge.
+function parseManualEdits(raw) {
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
 
 function formatValue(key, value) {
   if (value === null || value === undefined || value === "") return "—";
@@ -37,6 +59,9 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [courtDraft, setCourtDraft] = useState({ courtStatus: "", nextHearingDate: "" });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(null);
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     listStaff().then(setStaff).catch(() => setStaff([]));
@@ -53,6 +78,10 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
     let stale = false;
     setLoading(true);
     setError(null);
+    // Never carry a half-typed correction across to another caller's record.
+    setEditing(false);
+    setDraft(null);
+    setSaveError(null);
     getRecord(bucket, callId)
       .then((data) => {
         if (stale) return;
@@ -80,18 +109,54 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
   if (error) return <div className="case-detail empty-state">Couldn't load this call: {error}</div>;
   if (!caseData) return null;
 
+  // A failed save reports through saveError, not error: `error` means "this
+  // record wouldn't load" and replaces the whole pane, which on a save would
+  // throw away the corrections still sitting in the form.
   async function run(fn) {
     setSaving(true);
+    setSaveError(null);
     try {
       setCaseData(await fn());
       onChanged?.();
     } catch (err) {
-      setError(err.message);
+      setSaveError(err.message);
     } finally {
       setSaving(false);
     }
   }
 
+  function startEditing() {
+    const seed = { case_category: caseData.case_category || "", case_summary: caseData.case_summary || "" };
+    for (const [key, , type] of FIELD_ROWS) {
+      seed[key] = type === "bool" ? !!caseData[key] : caseData[key] ?? "";
+    }
+    setDraft(seed);
+    setEditing(true);
+  }
+
+  function saveEdits() {
+    // Diff against what's on screen and send only what actually changed, so
+    // merely opening the form doesn't mark every field as hand-corrected —
+    // a manually-corrected field stops accepting webhook updates for good.
+    const changed = {};
+    for (const [key, value] of Object.entries(draft)) {
+      const original = FIELD_ROWS.find(([k]) => k === key)?.[2] === "bool"
+        ? !!caseData[key]
+        : caseData[key] ?? "";
+      if (value !== original) changed[key] = value === "" ? null : value;
+    }
+    if (Object.keys(changed).length === 0) {
+      setEditing(false);
+      return;
+    }
+    return run(async () => {
+      const updated = await updateRecordFields(bucket, callId, changed);
+      setEditing(false);
+      return updated;
+    });
+  }
+
+  const edited = parseManualEdits(caseData.manual_edits);
   const staleDays = daysSince(caseData.court_status_updated);
   const isStale =
     caseData.court_status_updated && staleDays !== null && staleDays >= STALE_AFTER_DAYS;
@@ -133,6 +198,8 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
           ))}
         </select>
       </div>
+
+      {saveError && <div className="error-banner">Couldn't save: {saveError}</div>}
 
       <p className="case-summary-text">{caseData.case_summary || "No summary captured."}</p>
 
@@ -202,29 +269,105 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
         </div>
       </div>
 
-      <h3>Intake details</h3>
-      <div className="field-grid">
-        {FIELD_ROWS.map(([key, label]) => {
-          const validityKey = VALIDITY_KEYS[key];
-          const isInvalid = validityKey && caseData[key] && caseData[validityKey] === 0;
-          return (
+      <div className="section-heading">
+        <h3>Intake details</h3>
+        {!editing && (
+          <button className="link-button" disabled={saving} onClick={startEditing}>
+            Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="field-grid editing">
+          <div className="field-row">
+            <span className="field-label">Category</span>
+            <select
+              value={draft.case_category}
+              disabled={saving}
+              onChange={(e) => setDraft({ ...draft, case_category: e.target.value })}
+            >
+              <option value="">Uncategorized</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {FIELD_ROWS.map(([key, label, type]) => (
             <div className="field-row" key={key}>
               <span className="field-label">{label}</span>
-              <span className="field-value">
-                {formatValue(key, caseData[key])}
-                {isInvalid && (
-                  <span
-                    className="flag"
-                    title={`This ${label.toLowerCase()} doesn't look valid — may need a callback to confirm`}
-                  >
-                    ⚠ invalid
-                  </span>
-                )}
-              </span>
+              {type === "bool" ? (
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft[key]}
+                    disabled={saving}
+                    onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })}
+                  />
+                  {draft[key] ? "Yes" : "No"}
+                </label>
+              ) : (
+                <input
+                  value={draft[key]}
+                  disabled={saving}
+                  onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                />
+              )}
             </div>
-          );
-        })}
-      </div>
+          ))}
+
+          <div className="field-row full">
+            <span className="field-label">Summary</span>
+            <textarea
+              rows={3}
+              value={draft.case_summary}
+              disabled={saving}
+              onChange={(e) => setDraft({ ...draft, case_summary: e.target.value })}
+            />
+          </div>
+
+          <div className="inline-actions">
+            <button disabled={saving} onClick={saveEdits}>
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+            <button className="link-button" disabled={saving} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+            <span className="panel-note">
+              Corrections stick — a re-delivered call won't overwrite them.
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="field-grid">
+          {FIELD_ROWS.map(([key, label]) => {
+            const validityKey = VALIDITY_KEYS[key];
+            const isInvalid = validityKey && caseData[key] && caseData[validityKey] === 0;
+            return (
+              <div className="field-row" key={key}>
+                <span className="field-label">{label}</span>
+                <span className="field-value">
+                  {formatValue(key, caseData[key])}
+                  {edited.has(key) && (
+                    <span className="corrected" title="Corrected by staff; protected from webhook updates">
+                      edited
+                    </span>
+                  )}
+                  {isInvalid && (
+                    <span
+                      className="flag"
+                      title={`This ${label.toLowerCase()} doesn't look valid — may need a callback to confirm`}
+                    >
+                      ⚠ invalid
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {caseData.additional_details && (
         <>

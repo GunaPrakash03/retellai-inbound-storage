@@ -17,6 +17,7 @@ from .schemas import (
     CourtStatusUpdate,
     MessageCreate,
     MessageUpdate,
+    RecordFieldsUpdate,
     StaffCreate,
     StaffUpdate,
     StatusUpdate,
@@ -356,6 +357,21 @@ def _any_bucket_table(bucket: str) -> str:
 
 
 # Three-segment paths, so they don't collide with /{bucket}/{call_id} above.
+
+@app.patch("/{bucket}/{call_id}/fields")
+def patch_record_fields(bucket: str, call_id: str, body: RecordFieldsUpdate):
+    """Correct intake fields the speech-to-text extraction got wrong.
+
+    The mid-call lookup matches a caller against `caller_name`, so a misheard
+    name locks that caller out of their own case — this is the route that
+    fixes it. Corrections are marked in `manual_edits` and survive webhook
+    redelivery; see db.update_record_fields.
+    """
+    table = _any_bucket_table(bucket)
+    if not get_record(table, call_id):
+        raise HTTPException(status_code=404, detail="Record not found")
+    return db.update_record_fields(table, call_id, body.model_dump(exclude_unset=True))
+
 
 @app.patch("/{bucket}/{call_id}/assignment")
 def patch_assignment(bucket: str, call_id: str, body: AssignmentUpdate):

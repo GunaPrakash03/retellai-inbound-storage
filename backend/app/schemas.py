@@ -17,6 +17,30 @@ class CourtStatusUpdate(BaseModel):
     next_hearing_date: str | None = None
 
 
+class RecordFieldsUpdate(BaseModel):
+    """Staff corrections to intake fields the extraction got wrong.
+
+    Every field is optional and only those actually sent are applied
+    (`exclude_unset`), so the dashboard can PATCH one corrected name without
+    blanking everything else on the record.
+    """
+
+    caller_name: str | None = None
+    callback_phone: str | None = None
+    email: str | None = None
+    from_number: str | None = None
+    case_category: str | None = None
+    incident_date: str | None = None
+    location: str | None = None
+    opposing_party: str | None = None
+    key_date_or_deadline: str | None = None
+    case_summary: str | None = None
+    additional_details: str | None = None
+    represented_already: bool | None = None
+    injured: bool | None = None
+    police_report_filed: bool | None = None
+
+
 class StaffCreate(BaseModel):
     name: str
     role: str | None = None

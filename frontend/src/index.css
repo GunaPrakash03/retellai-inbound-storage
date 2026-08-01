@@ -429,6 +429,62 @@ tbody tr.selected {
   text-align: right;
 }
 
+/* Keeps the "Edit" control on the same baseline as the section title
+   instead of pushing the grid down a row. */
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.field-grid.editing .field-row {
+  align-items: center;
+}
+
+.field-grid.editing input[type="text"],
+.field-grid.editing input:not([type]),
+.field-grid.editing select,
+.field-grid.editing textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 62%;
+  font: inherit;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* The summary is prose, so it gets the full row rather than a right-hand
+   column the width of a phone number. */
+.field-grid.editing .field-row.full {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.field-grid.editing .field-row.full textarea {
+  max-width: 100%;
+  resize: vertical;
+}
+
+.field-grid.editing .inline-actions {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.corrected {
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
 .case-detail h3 {
   font-size: 12.5px;
   text-transform: uppercase;

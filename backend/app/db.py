@@ -1,8 +1,11 @@
+import json
 import os
 import secrets
 import sqlite3
 import uuid
 from pathlib import Path
+
+from .validators import is_valid_email, is_valid_phone, normalize_category
 
 DB_PATH = os.getenv("DB_PATH", "./data/cases.db")
 Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +54,7 @@ CREATE TABLE IF NOT EXISTS {table} (
     user_sentiment        TEXT,
     transcript            TEXT,
     recording_url         TEXT,
+    manual_edits          TEXT,
     status                TEXT NOT NULL DEFAULT 'new',
     created_at            TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
@@ -148,6 +152,7 @@ _NEW_COLUMNS = [
     ("court_status", "TEXT"),
     ("next_hearing_date", "TEXT"),
     ("court_status_updated", "TEXT"),
+    ("manual_edits", "TEXT"),
 ]
 for _table in BUCKETS:
     _existing = {row["name"] for row in _conn.execute(f"PRAGMA table_info({_table})")}
@@ -233,14 +238,26 @@ def upsert_record(table: str, row: dict) -> None:
     elif not row.get("case_number"):
         row["case_number"] = generate_case_number()
 
+    # Fields a human has corrected by hand outrank anything the extraction
+    # produced. Speech-to-text is what put the wrong value there in the first
+    # place, so a redelivered webhook re-extracting the same audio would just
+    # reinstate the same mistake and silently undo the correction.
+    protected = _manual_edits(existing)
+    for source, flag in _DEPENDENT_FLAGS.items():
+        if source in protected:
+            protected.add(flag)
+    refreshable = [c for c in _UPDATABLE_COLUMNS if c not in protected]
+
     columns = ["id", "call_id", "case_number"] + _UPDATABLE_COLUMNS
     placeholders = ", ".join(f":{c}" for c in columns)
     col_list = ", ".join(columns)
-    update_clause = ", ".join(f"{c} = excluded.{c}" for c in _UPDATABLE_COLUMNS)
+    update_clause = ", ".join(f"{c} = excluded.{c}" for c in refreshable)
+    if update_clause:
+        update_clause += ", "
 
     sql = f"""
         INSERT INTO {table} ({col_list}) VALUES ({placeholders})
-        ON CONFLICT(call_id) DO UPDATE SET {update_clause}, updated_at = datetime('now')
+        ON CONFLICT(call_id) DO UPDATE SET {update_clause}updated_at = datetime('now')
     """
     _conn.execute(sql, row)
     _conn.commit()
@@ -299,6 +316,88 @@ def find_by_case_number(case_number: str) -> dict | None:
         if row:
             return dict(row)
     return None
+
+
+# Intake fields staff may correct by hand. Everything the caller actually
+# said arrives via speech-to-text, which mishears names, spells them apart
+# ("Guruprakash" -> "Gunnar Prakash"), and drops digits from phone numbers —
+# and a wrong caller_name locks that caller out of their own case at the
+# mid-call lookup. Deliberately excludes the raw call artifacts (transcript,
+# recording_url, call_summary, user_sentiment): those are the evidence of
+# what was actually said, and editing them would destroy the record staff
+# check a correction against.
+EDITABLE_COLUMNS = [
+    "caller_name",
+    "callback_phone",
+    "email",
+    "from_number",
+    "case_category",
+    "incident_date",
+    "location",
+    "opposing_party",
+    "key_date_or_deadline",
+    "case_summary",
+    "additional_details",
+    "represented_already",
+    "injured",
+    "police_report_filed",
+]
+
+_BOOL_COLUMNS = {"represented_already", "injured", "police_report_filed"}
+
+# Validity flags are derived from a field, so protecting a corrected value
+# has to protect its flag too — otherwise a redelivery recomputes the flag
+# from the extraction's original wrong number and re-raises the warning
+# against a number staff already fixed.
+_DEPENDENT_FLAGS = {"callback_phone": "is_phone_valid", "email": "is_email_valid"}
+
+
+def _manual_edits(record: dict | None) -> set[str]:
+    """Field names a human has corrected on this record."""
+    raw = (record or {}).get("manual_edits")
+    if not raw:
+        return set()
+    try:
+        loaded = json.loads(raw)
+    except (TypeError, ValueError):
+        return set()
+    return set(loaded) if isinstance(loaded, list) else set()
+
+
+def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
+    """Apply staff corrections to a record's intake fields.
+
+    Marks each corrected field in `manual_edits` so a redelivered webhook
+    can't overwrite it (see upsert_record). Recomputes the phone and email
+    validity flags from the new values, so a corrected number stops showing
+    the "invalid" warning the old one earned.
+    """
+    _check_bucket(table)
+    updates = {k: v for k, v in fields.items() if k in EDITABLE_COLUMNS}
+    if not updates:
+        return get_record(table, call_id)
+
+    for col in _BOOL_COLUMNS & updates.keys():
+        updates[col] = None if updates[col] is None else int(bool(updates[col]))
+    if "case_category" in updates:
+        updates["case_category"] = normalize_category(updates["case_category"])
+    if "callback_phone" in updates:
+        valid = is_valid_phone(updates["callback_phone"])
+        updates["is_phone_valid"] = None if valid is None else int(valid)
+    if "email" in updates:
+        valid = is_valid_email(updates["email"])
+        updates["is_email_valid"] = None if valid is None else int(valid)
+
+    edited = _manual_edits(get_record(table, call_id)) | (updates.keys() & set(EDITABLE_COLUMNS))
+    updates["manual_edits"] = json.dumps(sorted(edited))
+
+    clause = ", ".join(f"{k} = :{k}" for k in updates)
+    _conn.execute(
+        f"UPDATE {table} SET {clause}, updated_at = datetime('now') WHERE call_id = :__cid",
+        {**updates, "__cid": call_id},
+    )
+    _conn.commit()
+    return get_record(table, call_id)
 
 
 def set_case_assignment(table: str, call_id: str, assigned_to: str | None) -> None:

@@ -33,6 +33,16 @@ export function updateRecordStatus(bucket, callId, status) {
   });
 }
 
+// Sends only the fields that actually changed — the backend applies exactly
+// what it receives, so posting untouched fields would mark them as manually
+// corrected and needlessly shield them from future webhook updates.
+export function updateRecordFields(bucket, callId, fields) {
+  return request(`/${bucket}/${encodeURIComponent(callId)}/fields`, {
+    method: "PATCH",
+    body: JSON.stringify(fields),
+  });
+}
+
 export function updateAssignment(bucket, callId, assignedTo) {
   return request(`/${bucket}/${encodeURIComponent(callId)}/assignment`, {
     method: "PATCH",

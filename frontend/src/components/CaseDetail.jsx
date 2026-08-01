@@ -59,7 +59,7 @@ function formatValue(key, value) {
   return value;
 }
 
-export default function CaseDetail({ bucket, callId, onChanged }) {
+export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtypeLabels = {} }) {
   const [caseData, setCaseData] = useState(null);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -141,6 +141,7 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
     const seed = {
       case_category: caseData.case_category || "",
       case_subcategory: caseData.case_subcategory || "",
+      case_subtype: caseData.case_subtype || "",
       case_summary: caseData.case_summary || "",
     };
     for (const [key, , type] of FIELD_ROWS) {
@@ -173,6 +174,9 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
   }
 
   const edited = parseManualEdits(caseData.manual_edits);
+  // Subtype choices for the case type currently drafted, from the taxonomy.
+  const subtypeOptions =
+    (editing && draft && taxonomy?.[draft.case_category]?.subtypes?.[draft.case_subcategory]) || [];
   const staleDays = daysSince(caseData.court_status_updated);
   const isStale =
     caseData.court_status_updated && staleDays !== null && staleDays >= STALE_AFTER_DAYS;
@@ -200,6 +204,11 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
             {caseData.case_subcategory && (
               <span className="subcategory-badge">
                 {SUBCATEGORY_LABELS[caseData.case_subcategory] || caseData.case_subcategory}
+              </span>
+            )}
+            {caseData.case_subtype && (
+              <span className="subcategory-badge subtype-badge">
+                {subtypeLabels[caseData.case_subtype] || caseData.case_subtype}
               </span>
             )}
             {!!caseData.emergency_flagged && (
@@ -349,10 +358,30 @@ export default function CaseDetail({ bucket, callId, onChanged }) {
               <select
                 value={draft.case_subcategory}
                 disabled={saving}
-                onChange={(e) => setDraft({ ...draft, case_subcategory: e.target.value })}
+                // Changing the case type clears a now-mismatched subtype (the
+                // backend does the same on save).
+                onChange={(e) =>
+                  setDraft({ ...draft, case_subcategory: e.target.value, case_subtype: "" })
+                }
               >
                 <option value="">Not specified</option>
                 {SUBCATEGORIES[draft.case_category].map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {subtypeOptions.length > 0 && (
+            <div className="field-row">
+              <span className="field-label">Detailed type</span>
+              <select
+                value={draft.case_subtype}
+                disabled={saving}
+                onChange={(e) => setDraft({ ...draft, case_subtype: e.target.value })}
+              >
+                <option value="">Not specified</option>
+                {subtypeOptions.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>

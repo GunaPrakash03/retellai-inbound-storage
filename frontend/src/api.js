@@ -18,6 +18,12 @@ export function getCategoryCounts() {
   return request("/category-counts");
 }
 
+// The finer taxonomy (case types + subtypes) — fetched once so the ~260
+// subtype labels live only in the backend. Currently only employment.
+export function getTaxonomy() {
+  return request("/taxonomy");
+}
+
 export function listRecords(bucket, { category, status, subcategory, assignedTo, limit } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);

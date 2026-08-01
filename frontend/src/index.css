@@ -511,6 +511,11 @@ tbody tr.selected {
   color: var(--ink-soft);
 }
 
+/* The third taxonomy level — a lighter tag than the matter-type badge. */
+.subtype-badge {
+  font-style: italic;
+}
+
 .flag {
   margin-left: 6px;
   color: #b45309;

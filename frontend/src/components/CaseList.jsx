@@ -30,6 +30,7 @@ export default function CaseList({
   assignedFilter,
   onSubcategoryChange,
   onAssignedChange,
+  subtypeLabels = {},
 }) {
   // In category mode `cases` is the whole practice area; the dropdowns offer
   // only values that actually occur in it, and filtering happens here so the
@@ -139,6 +140,11 @@ export default function CaseList({
                       {c.case_subcategory
                         ? SUBCATEGORY_LABELS[c.case_subcategory] || c.case_subcategory
                         : "—"}
+                      {c.case_subtype && (
+                        <div className="subcategory-line">
+                          {subtypeLabels[c.case_subtype] || c.case_subtype}
+                        </div>
+                      )}
                     </td>
                   ) : (
                     <td>

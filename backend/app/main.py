@@ -72,6 +72,24 @@ def get_category_counts():
     return db.count_cases_by_category()
 
 
+@app.get("/taxonomy")
+def get_taxonomy():
+    """The finer taxonomy (case types + subtypes) the dashboard renders, so
+    the ~260 labels live in one place (backend taxonomy.py) rather than being
+    duplicated in the frontend. Only employment is populated so far."""
+    from . import taxonomy
+
+    return {
+        taxonomy.EMPLOYMENT_CATEGORY: {
+            "types": [{"value": v, "label": l} for v, l in taxonomy.EMPLOYMENT_TYPES],
+            "subtypes": {
+                type_slug: [{"value": s, "label": lbl} for s, lbl in subs]
+                for type_slug, subs in taxonomy.EMPLOYMENT_SUBTYPES.items()
+            },
+        }
+    }
+
+
 # The /debug routes exist only when DEBUG_ENDPOINTS=1 is set. They are
 # unauthenticated, and /debug/last-webhook echoes the full raw webhook body —
 # a real call's transcript, name, and phone number — so they must never be

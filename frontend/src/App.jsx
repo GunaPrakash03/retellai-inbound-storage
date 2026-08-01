@@ -5,7 +5,7 @@ import CategoryOverview from "./components/CategoryOverview";
 import MessagesView from "./components/MessagesView";
 import Sidebar from "./components/Sidebar";
 import StaffView from "./components/StaffView";
-import { getCategoryCounts, getCounts, listRecords } from "./api";
+import { getCategoryCounts, getCounts, getTaxonomy, listRecords } from "./api";
 import { BUCKETS, CATEGORY_LABELS, FIRM_NAME, VIEWS } from "./constants";
 
 const CASES_BUCKET = "cases";
@@ -16,6 +16,7 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [counts, setCounts] = useState(null);
   const [categoryCounts, setCategoryCounts] = useState(null);
+  const [taxonomy, setTaxonomy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCallId, setSelectedCallId] = useState(null);
@@ -32,6 +33,11 @@ export default function App() {
 
   const refreshCounts = useCallback(() => {
     getCounts().then(setCounts).catch(() => {});
+  }, []);
+
+  // The finer taxonomy (case types + subtypes) rarely changes — fetch once.
+  useEffect(() => {
+    getTaxonomy().then(setTaxonomy).catch(() => setTaxonomy(null));
   }, []);
 
   const refresh = useCallback(() => {
@@ -98,6 +104,14 @@ export default function App() {
 
   const activeBucket = BUCKETS.find((b) => b.key === bucket);
   const isCasesSection = bucket === CASES_BUCKET;
+
+  // Flat subtype slug -> label, derived from the fetched taxonomy, for display.
+  const subtypeLabels = {};
+  for (const area of Object.values(taxonomy || {})) {
+    for (const subs of Object.values(area.subtypes || {})) {
+      for (const s of subs) subtypeLabels[s.value] = s.label;
+    }
+  }
 
   return (
     <div className="app">
@@ -166,8 +180,15 @@ export default function App() {
                   assignedFilter={assignedFilter}
                   onSubcategoryChange={setSubcategoryFilter}
                   onAssignedChange={setAssignedFilter}
+                  subtypeLabels={subtypeLabels}
                 />
-                <CaseDetail bucket={bucket} callId={selectedCallId} onChanged={refresh} />
+                <CaseDetail
+                  bucket={bucket}
+                  callId={selectedCallId}
+                  onChanged={refresh}
+                  taxonomy={taxonomy}
+                  subtypeLabels={subtypeLabels}
+                />
               </div>
             </div>
           )}

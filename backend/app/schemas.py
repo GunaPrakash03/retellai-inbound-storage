@@ -32,6 +32,7 @@ class RecordFieldsUpdate(BaseModel):
     from_number: str | None = None
     case_category: str | None = None
     case_subcategory: str | None = None
+    case_subtype: str | None = None
     incident_date: str | None = None
     location: str | None = None
     opposing_party: str | None = None

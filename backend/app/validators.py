@@ -1,6 +1,13 @@
 import re
 from difflib import SequenceMatcher
 
+from .taxonomy import (
+    EMPLOYMENT_CATEGORY,
+    EMPLOYMENT_SUBTYPES,
+    EMPLOYMENT_TYPE_LABELS,
+    slugify as _clean_slug,
+)
+
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
 VALID_CATEGORIES = {
@@ -33,13 +40,9 @@ VALID_SUBCATEGORIES = {
         "wrongful_death",
         "boating_accident",
     },
-    "workplace_employment": {
-        "workplace_injury_workers_comp",
-        "wrongful_termination",
-        "discrimination",
-        "harassment",
-        "wage_and_hour",
-    },
+    # Employment's case types come from the full taxonomy (25 of them); its
+    # third level (subtype) lives in VALID_SUBTYPES below. See taxonomy.py.
+    "workplace_employment": set(EMPLOYMENT_TYPE_LABELS),
     "medical_product": {
         "medical_malpractice",
         "defective_product",
@@ -88,19 +91,14 @@ VALID_SUBCATEGORIES = {
 }
 
 
-# Dropped when slugifying, so the human-readable label and the stored value
-# collapse to the same thing: "Child Custody and Visitation" and
-# "child_custody_visitation" both become "child_custody_visitation".
-_SLUG_STOPWORDS = {"and", "or", "of", "the", "a", "an"}
-
-
-def _clean_slug(value: str) -> str:
-    """Collapse a label to the snake_case form the lists use, dropping filler
-    words — "Family Law," -> "family_law", "Adoption and Guardianship" ->
-    "adoption_guardianship"."""
-    tokens = re.split(r"[^a-z0-9]+", value.lower())
-    kept = [t for t in tokens if t and t not in _SLUG_STOPWORDS]
-    return "_".join(kept)
+# Subtypes, the third taxonomy level, keyed by (category, case_type). Only
+# employment is specified so far; validation is by the (type, subtype) pair,
+# so a subtype slug shared by two types is only accepted under a type that
+# actually lists it. See taxonomy.py and CASE-TAXONOMY.md.
+VALID_SUBTYPES = {
+    (EMPLOYMENT_CATEGORY, case_type): {slug for slug, _ in subs}
+    for case_type, subs in EMPLOYMENT_SUBTYPES.items()
+}
 
 
 def normalize_category(category: str | None) -> str | None:
@@ -124,6 +122,19 @@ def normalize_subcategory(subcategory: str | None, category: str | None) -> str 
         return None
     cleaned = _clean_slug(subcategory)
     return cleaned if cleaned in VALID_SUBCATEGORIES.get(category or "", ()) else None
+
+
+def normalize_subtype(
+    subtype: str | None, category: str | None, case_type: str | None
+) -> str | None:
+    """Valid subtype for the given (category, case_type), or None. Validated
+    against the pair — a subtype only counts under a case type that actually
+    lists it. Dropped rather than stored raw, like subcategory."""
+    if not subtype:
+        return None
+    cleaned = _clean_slug(subtype)
+    allowed = VALID_SUBTYPES.get((category or "", case_type or ""), ())
+    return cleaned if cleaned in allowed else None
 
 
 def is_valid_phone(phone: str | None) -> bool | None:

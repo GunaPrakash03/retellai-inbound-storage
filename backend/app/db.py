@@ -5,7 +5,13 @@ import sqlite3
 import uuid
 from pathlib import Path
 
-from .validators import is_valid_email, is_valid_phone, normalize_category, normalize_subcategory
+from .validators import (
+    is_valid_email,
+    is_valid_phone,
+    normalize_category,
+    normalize_subcategory,
+    normalize_subtype,
+)
 
 DB_PATH = os.getenv("DB_PATH", "./data/cases.db")
 Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
@@ -36,6 +42,7 @@ CREATE TABLE IF NOT EXISTS {table} (
     court_status_updated  TEXT,
     case_category         TEXT,
     case_subcategory      TEXT,
+    case_subtype          TEXT,
     caller_name           TEXT,
     callback_phone        TEXT,
     is_phone_valid        INTEGER,
@@ -157,6 +164,7 @@ _NEW_COLUMNS = [
     ("manual_edits", "TEXT"),
     ("case_subcategory", "TEXT"),
     ("hearing_attorney", "TEXT"),
+    ("case_subtype", "TEXT"),
 ]
 for _table in BUCKETS:
     _existing = {row["name"] for row in _conn.execute(f"PRAGMA table_info({_table})")}
@@ -378,6 +386,7 @@ EDITABLE_COLUMNS = [
     "from_number",
     "case_category",
     "case_subcategory",
+    "case_subtype",
     "incident_date",
     "location",
     "opposing_party",
@@ -441,6 +450,19 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
     elif "case_category" in updates and (current or {}).get("case_subcategory"):
         if normalize_subcategory(current["case_subcategory"], effective_category) is None:
             updates["case_subcategory"] = None
+    # Subtype (third level) is validated against the category+case_type it
+    # lands on, and cleared when a category/subcategory change strands it.
+    effective_type = updates.get("case_subcategory", (current or {}).get("case_subcategory"))
+    if "case_subtype" in updates:
+        updates["case_subtype"] = normalize_subtype(
+            updates["case_subtype"], effective_category, effective_type
+        )
+    elif (
+        ("case_category" in updates or "case_subcategory" in updates)
+        and (current or {}).get("case_subtype")
+        and normalize_subtype(current["case_subtype"], effective_category, effective_type) is None
+    ):
+        updates["case_subtype"] = None
     if "callback_phone" in updates:
         valid = is_valid_phone(updates["callback_phone"])
         updates["is_phone_valid"] = None if valid is None else int(valid)
@@ -458,6 +480,32 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
     )
     _conn.commit()
     return get_record(table, call_id)
+
+
+def set_classification(
+    table: str, call_id: str, case_subcategory: str | None, case_subtype: str | None
+) -> None:
+    """Write the LLM classifier's case type + subtype onto a record.
+
+    Skips either field a human has already corrected (`manual_edits`) — the
+    classifier never overrides a staff decision. Not marked as a manual edit
+    itself, so a later human correction still wins and a webhook redelivery
+    can still re-run classification. See app/classify.py."""
+    _check_bucket(table)
+    protected = _manual_edits(get_record(table, call_id))
+    updates: dict = {}
+    if "case_subcategory" not in protected and case_subcategory is not None:
+        updates["case_subcategory"] = case_subcategory
+    if "case_subtype" not in protected:
+        updates["case_subtype"] = case_subtype
+    if not updates:
+        return
+    clause = ", ".join(f"{k} = :{k}" for k in updates)
+    _conn.execute(
+        f"UPDATE {table} SET {clause}, updated_at = datetime('now') WHERE call_id = :__c",
+        {**updates, "__c": call_id},
+    )
+    _conn.commit()
 
 
 def set_case_assignment(table: str, call_id: str, assigned_to: str | None) -> None:

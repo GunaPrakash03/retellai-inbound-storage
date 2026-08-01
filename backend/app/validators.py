@@ -1,4 +1,5 @@
 import re
+from difflib import SequenceMatcher
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
@@ -42,6 +43,70 @@ def is_valid_email(email: str | None) -> bool | None:
     if not email:
         return None
     return bool(_EMAIL_RE.match(email.strip()))
+
+
+# Thresholds for matching a caller's spoken name against the name on file.
+# Whole-name comparison ignores spacing, so it is the looser of the two; a
+# single name part is much shorter, where a small edit is proportionally a
+# bigger difference, so it has to clear a higher bar.
+_NAME_SIMILARITY = 0.80
+_TOKEN_SIMILARITY = 0.85
+# Shortest fragment allowed to match on its own. Exact matches on a whole
+# name part are exempt — plenty of real first names are shorter than this.
+_MIN_PARTIAL = 4
+
+
+def _squash(name: str) -> str:
+    """Lowercase letters only — no spaces, punctuation, or digits."""
+    return re.sub(r"[^a-z]", "", name.lower())
+
+
+def name_matches(given: str | None, on_file: str | None) -> bool:
+    """Does the name a caller gave plausibly match the name on their case?
+
+    Both sides of this comparison came through a phone line, so neither is
+    trustworthy character-for-character. One caller has reached us as
+    "Guruprakash", "Guna Prakash", and "Kunal Prahash" across three calls —
+    the same person each time. A plain substring test fails all of those:
+    the space in "Guna Prakash" alone is enough to reject "Gunaprakash".
+
+    So compare three ways, cheapest first:
+      1. the whole name with spacing removed, fuzzily — catches a name
+         merged, split, or misheard by a couple of letters;
+      2. an exact match on any one name part — a caller who gives only
+         "Alex" for "Alex Rivera", which is normal and expected;
+      3. a name part that is close enough to one on file, or contained in
+         it, provided it is long enough to mean something.
+
+    A minimum length applies to everything except an exact name-part match.
+    Without it the old check accepted "a" for "Maria Santos", which made the
+    name useless as a second identity factor.
+    """
+    if not given or not on_file:
+        return False
+
+    squashed_given, squashed_file = _squash(given), _squash(on_file)
+    if not squashed_given or not squashed_file:
+        return False
+
+    if SequenceMatcher(None, squashed_given, squashed_file).ratio() >= _NAME_SIMILARITY:
+        return True
+
+    given_parts = [p for p in (_squash(p) for p in given.split()) if p]
+    file_parts = [p for p in (_squash(p) for p in on_file.split()) if p]
+
+    for part in given_parts:
+        if part in file_parts:
+            return True
+        if len(part) < _MIN_PARTIAL:
+            continue
+        if part in squashed_file:
+            return True
+        for other in file_parts:
+            if SequenceMatcher(None, part, other).ratio() >= _TOKEN_SIMILARITY:
+                return True
+
+    return False
 
 
 # Fragments of the agent's own scripted closing lines, used to work out how

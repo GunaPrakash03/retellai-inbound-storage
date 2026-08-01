@@ -23,6 +23,7 @@ from .schemas import (
     StatusUpdate,
 )
 from .security import SlidingWindowLimiter, verify_signature
+from .validators import name_matches
 from .webhooks import _last_attempt, router as webhook_router
 
 app = FastAPI(title="Retell Intake Backend")
@@ -172,6 +173,10 @@ _LOOKUP_PER_IP_PER_MIN = 20
 _LOOKUP_GLOBAL_PER_MIN = 60
 _LOOKUP_FAILS_PER_IP_PER_HOUR = 30
 
+# Values the agent sends when it hasn't actually collected the field. Not a
+# real answer from the caller, so not a real lookup attempt.
+_PLACEHOLDERS = {"unknown", "unspecified", "n/a", "na", "none", "null", "not provided"}
+
 _lookup_ip_limit = SlidingWindowLimiter(_LOOKUP_PER_IP_PER_MIN, 60)
 _lookup_global_limit = SlidingWindowLimiter(_LOOKUP_GLOBAL_PER_MIN, 60)
 _lookup_fail_limit = SlidingWindowLimiter(_LOOKUP_FAILS_PER_IP_PER_HOUR, 3600)
@@ -269,6 +274,18 @@ async def case_lookup(request: Request):
             status_code=422, detail="case_number and caller_name are required"
         )
 
+    # The agent has called this with the literal string "unknown" in place of
+    # a value it hadn't collected yet — the prompt tells it to record unknown
+    # fields that way, and it applied that to the arguments. Treat a
+    # placeholder as "not asked yet" rather than a failed lookup: a 422 tells
+    # the agent to go and ask, and it doesn't spend the caller's
+    # failed-lookup budget on a question that was never put to them.
+    if case_number.lower() in _PLACEHOLDERS or caller_name.lower() in _PLACEHOLDERS:
+        raise HTTPException(
+            status_code=422,
+            detail="Ask the caller for their case number and name before looking up",
+        )
+
     if _lookup_fail_limit.blocked(ip):
         raise HTTPException(
             status_code=429, detail="Too many failed lookups — try again later"
@@ -276,11 +293,9 @@ async def case_lookup(request: Request):
 
     record = db.find_by_case_number(case_number)
 
-    on_file = ((record or {}).get("caller_name") or "").strip().lower()
-    given = caller_name.lower()
-    # Accept a first name or partial match — callers give "Alex" when the
-    # file says "Alex Rivera", and the number is the primary factor here.
-    name_ok = bool(on_file) and (given in on_file or on_file in given)
+    # Both names came through a phone line, so neither is reliable
+    # character-for-character; see validators.name_matches.
+    name_ok = name_matches(caller_name, (record or {}).get("caller_name"))
 
     if not record or not name_ok:
         _lookup_fail_limit.record(ip)

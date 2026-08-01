@@ -5,7 +5,7 @@ import MessagesView from "./components/MessagesView";
 import Sidebar from "./components/Sidebar";
 import StaffView from "./components/StaffView";
 import { getCounts, listRecords } from "./api";
-import { BUCKETS, VIEWS } from "./constants";
+import { BUCKETS, FIRM_NAME, VIEWS } from "./constants";
 
 export default function App() {
   const [bucket, setBucket] = useState(BUCKETS[0].key);
@@ -57,8 +57,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Case Intake</h1>
-        <span className="subtitle">Calls captured by the Retell voice agent</span>
+        <span className="firm-mark" aria-hidden="true">⚖</span>
+        <div className="firm-identity">
+          <span className="firm-name">{FIRM_NAME}</span>
+          <span className="app-title">Case Intake</span>
+        </div>
+        <span className="subtitle">Calls captured by the intake line</span>
       </header>
 
       <div className="app-body">

@@ -1,3 +1,7 @@
+// Shown in the header masthead. Change this to the firm's name — it's the
+// one place the brand name lives, so nothing else needs touching.
+export const FIRM_NAME = "Law Office of [Your Firm]";
+
 export const CATEGORIES = [
   { value: "personal_injury", label: "Personal Injury" },
   { value: "workplace_employment", label: "Workplace & Employment" },

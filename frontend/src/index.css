@@ -1,20 +1,22 @@
 :root {
-  --ink: #1b1e24;
-  --ink-soft: #5b6270;
-  --bg: #f3f4f7;
+  --ink: #1a2230;
+  --ink-soft: #5c6472;
+  --bg: #f4f2ec;
   --panel: #ffffff;
-  --border: #dde1e7;
-  --accent: #3059c7;
-  --accent-soft: #e7ecfa;
+  --border: #e3ddd1;
+  --accent: #17385c;         /* deep navy — the firm's primary */
+  --accent-soft: #e7ebf1;
+  --gold: #9c7c30;           /* muted brass, readable on white */
+  --gold-soft: #f1e9d4;
 
-  --status-new-bg: #dce6ff;
-  --status-new-fg: #1d3fa0;
-  --status-reviewed-bg: #ffe9c7;
-  --status-reviewed-fg: #8a5a10;
-  --status-contacted-bg: #e3dcfb;
-  --status-contacted-fg: #5836ba;
-  --status-closed-bg: #dde1e7;
-  --status-closed-fg: #4a5160;
+  --status-new-bg: #dfe6f1;
+  --status-new-fg: #1c3a63;
+  --status-reviewed-bg: #f3e7cc;
+  --status-reviewed-fg: #7f5c15;
+  --status-contacted-bg: #e0e7de;
+  --status-contacted-fg: #3d5a3a;
+  --status-closed-bg: #e5e0d6;
+  --status-closed-fg: #55606e;
 
   --cat-1: #2f6f4f;
   --cat-2: #7a4b1e;
@@ -27,6 +29,9 @@
   --cat-9: #2f7a6f;
   --cat-10: #55606e;
 
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+    Georgia, serif;
+
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   color: var(--ink);
   background: var(--bg);
@@ -35,22 +40,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #e7e9ee;
-    --ink-soft: #9aa2b1;
-    --bg: #14161b;
-    --panel: #1b1e25;
-    --border: #2b2f38;
-    --accent: #7f9dff;
-    --accent-soft: #23294a;
+    --ink: #e9e6dd;
+    --ink-soft: #9c9587;
+    --bg: #14161a;
+    --panel: #1c1f26;
+    --border: #2f2d2a;
+    --accent: #8fb0dc;       /* lightened navy for dark surfaces */
+    --accent-soft: #22304a;
+    --gold: #cea54c;
+    --gold-soft: #33301f;
 
-    --status-new-bg: #23294a;
-    --status-new-fg: #a9bcff;
-    --status-reviewed-bg: #3d3220;
-    --status-reviewed-fg: #f0c584;
-    --status-contacted-bg: #322a4d;
-    --status-contacted-fg: #c9b6f5;
-    --status-closed-bg: #2b2f38;
-    --status-closed-fg: #b6bcc7;
+    --status-new-bg: #22304a;
+    --status-new-fg: #a9c2e8;
+    --status-reviewed-bg: #3a3018;
+    --status-reviewed-fg: #eabf6f;
+    --status-contacted-bg: #26331f;
+    --status-contacted-fg: #a7c79c;
+    --status-closed-bg: #2f2d2a;
+    --status-closed-fg: #b6b0a4;
   }
 }
 
@@ -69,23 +76,62 @@ body {
 }
 
 .app-header {
-  padding: 20px 28px 16px;
+  padding: 16px 28px;
   border-bottom: 1px solid var(--border);
+  box-shadow: inset 0 -3px 0 var(--gold);
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   background: var(--panel);
 }
 
-.app-header h1 {
-  font-size: 20px;
-  margin: 0;
+/* Scales of justice — the firm's mark. Gold on a faint tinted disc. */
+.firm-mark {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-radius: 50%;
+}
+
+.firm-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: auto;
+}
+
+.firm-name {
+  font-family: var(--serif);
+  font-size: 19px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.app-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
 }
 
 .subtitle {
   color: var(--ink-soft);
   font-size: 13px;
+  font-style: italic;
+  font-family: var(--serif);
+}
+
+@media (max-width: 620px) {
+  .subtitle { display: none; }
 }
 
 .error-banner {
@@ -205,7 +251,10 @@ body {
 }
 
 .bucket-intro h2 {
-  font-size: 16px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
   margin: 0 0 2px;
 }
 
@@ -551,11 +600,17 @@ tbody tr.selected {
 }
 
 .case-number-badge {
+  display: inline-block;
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+  border-radius: 6px;
+  padding: 3px 9px;
 }
 
 /* ---- handling / court status ---- */
@@ -635,7 +690,10 @@ tbody tr.selected {
 }
 
 .panel-header h2 {
-  font-size: 17px;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--accent);
   margin: 0 0 4px;
 }
 

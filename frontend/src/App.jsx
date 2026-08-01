@@ -5,7 +5,7 @@ import CategoryOverview from "./components/CategoryOverview";
 import MessagesView from "./components/MessagesView";
 import Sidebar from "./components/Sidebar";
 import StaffView from "./components/StaffView";
-import { getCategoryCounts, getCounts, listRecords, listStaff } from "./api";
+import { getCategoryCounts, getCounts, listRecords } from "./api";
 import { BUCKETS, CATEGORY_LABELS, FIRM_NAME, VIEWS } from "./constants";
 
 const CASES_BUCKET = "cases";
@@ -16,7 +16,6 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [counts, setCounts] = useState(null);
   const [categoryCounts, setCategoryCounts] = useState(null);
-  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCallId, setSelectedCallId] = useState(null);
@@ -35,10 +34,6 @@ export default function App() {
     getCounts().then(setCounts).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    listStaff().then(setStaff).catch(() => setStaff([]));
-  }, []);
-
   const refresh = useCallback(() => {
     refreshCounts();
     if (view !== null) return;
@@ -49,9 +44,13 @@ export default function App() {
     }
 
     setLoading(true);
+    // In the Cases section we fetch the whole practice area and filter it in
+    // the browser, so the matter-type and attorney dropdowns can offer only
+    // values that actually occur — and those options don't collapse when a
+    // filter is applied. Other buckets filter server-side as before.
     const filters =
       bucket === CASES_BUCKET
-        ? { category: caseCategory, subcategory: subcategoryFilter, assignedTo: assignedFilter, status: statusFilter }
+        ? { category: caseCategory, limit: 500 }
         : { category: categoryFilter, status: statusFilter };
     listRecords(bucket, filters)
       .then((data) => {
@@ -60,10 +59,7 @@ export default function App() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [
-    bucket, view, onCategoryHome, caseCategory, subcategoryFilter,
-    assignedFilter, categoryFilter, statusFilter, refreshCounts,
-  ]);
+  }, [bucket, view, onCategoryHome, caseCategory, categoryFilter, statusFilter, refreshCounts]);
 
   useEffect(() => {
     refresh();
@@ -166,7 +162,6 @@ export default function App() {
                   onStatusChange={setStatusFilter}
                   categoryMode={isCasesSection}
                   activeCategory={caseCategory}
-                  staff={staff}
                   subcategoryFilter={subcategoryFilter}
                   assignedFilter={assignedFilter}
                   onSubcategoryChange={setSubcategoryFilter}

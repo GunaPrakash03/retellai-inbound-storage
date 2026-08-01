@@ -26,14 +26,29 @@ export default function CaseList({
   onStatusChange,
   categoryMode = false,
   activeCategory,
-  staff = [],
   subcategoryFilter,
   assignedFilter,
   onSubcategoryChange,
   onAssignedChange,
 }) {
-  const subcategoryOptions = SUBCATEGORIES[activeCategory] || [];
-  const assignableStaff = staff.filter((s) => s.active);
+  // In category mode `cases` is the whole practice area; the dropdowns offer
+  // only values that actually occur in it, and filtering happens here so the
+  // options stay stable as filters are applied.
+  const present = categoryMode ? cases : [];
+  const presentSubs = new Set(present.map((c) => c.case_subcategory).filter(Boolean));
+  const subcategoryOptions = (SUBCATEGORIES[activeCategory] || []).filter((s) =>
+    presentSubs.has(s.value),
+  );
+  const attorneyOptions = [...new Set(present.map((c) => c.assigned_to).filter(Boolean))].sort();
+
+  const rows = categoryMode
+    ? cases.filter(
+        (c) =>
+          (!subcategoryFilter || c.case_subcategory === subcategoryFilter) &&
+          (!assignedFilter || c.assigned_to === assignedFilter) &&
+          (!statusFilter || c.status === statusFilter),
+      )
+    : cases;
 
   return (
     <div className="case-list">
@@ -52,16 +67,18 @@ export default function CaseList({
                 ))}
               </select>
             )}
-            <select
-              value={assignedFilter}
-              onChange={(e) => onAssignedChange(e.target.value)}
-              aria-label="Filter by assigned attorney"
-            >
-              <option value="">All attorneys</option>
-              {assignableStaff.map((s) => (
-                <option key={s.id} value={s.name}>{s.name}</option>
-              ))}
-            </select>
+            {attorneyOptions.length > 0 && (
+              <select
+                value={assignedFilter}
+                onChange={(e) => onAssignedChange(e.target.value)}
+                aria-label="Filter by assigned attorney"
+              >
+                <option value="">All attorneys</option>
+                {attorneyOptions.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            )}
           </>
         ) : (
           <select value={categoryFilter} onChange={(e) => onCategoryChange(e.target.value)}>
@@ -80,9 +97,9 @@ export default function CaseList({
       </div>
 
       <div className="table-wrap">
-        {loading && cases.length === 0 ? (
+        {loading && rows.length === 0 ? (
           <div className="empty-state">Loading…</div>
-        ) : cases.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="empty-state">No calls match these filters.</div>
         ) : (
           <table>
@@ -109,7 +126,7 @@ export default function CaseList({
               )}
             </thead>
             <tbody>
-              {cases.map((c) => (
+              {rows.map((c) => (
                 <tr
                   key={c.call_id}
                   className={c.call_id === selectedCallId ? "selected" : ""}

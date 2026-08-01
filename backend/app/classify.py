@@ -15,6 +15,7 @@ with GEMINI_API_KEY (required to classify) and optionally GEMINI_MODEL
 """
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -36,10 +37,21 @@ _NONE = "None"  # sentinel enum value — Gemini enums can't express null cleanl
 # Below this, store nothing — a weak guess is worse than a blank field.
 _MIN_CONFIDENCE = 0.4
 
+# Retry these transient Gemini statuses (rate limit / overloaded) before
+# giving up, so one throttled call doesn't silently blank a classification.
+_RETRY_STATUSES = {429, 503, 500}
+_MAX_ATTEMPTS = 3
+
+# Reason the most recent _gemini() gave up, surfaced by diagnose() so a live
+# check can tell a rate limit ("http_429") from a timeout or a missing key.
+_LAST_ERROR: str | None = None
+
 
 # --------------------------------------------------------------- HTTP ------
 
-def _post(model: str, api_key: str, body: dict) -> dict | None:
+def _post(model: str, api_key: str, body: dict) -> tuple[dict | None, str | None]:
+    """POST to Gemini. Returns (payload, error) — error is a short reason
+    string ('http_429', 'timeout', 'neterr_*', 'bad_json') on failure."""
     req = urllib.request.Request(
         _ENDPOINT.format(model=model),
         data=json.dumps(body).encode(),
@@ -48,9 +60,15 @@ def _post(model: str, api_key: str, body: dict) -> dict | None:
     )
     try:
         with urllib.request.urlopen(req, timeout=_TIMEOUT_S) as resp:
-            return json.loads(resp.read().decode())
-    except (urllib.error.URLError, TimeoutError, ValueError):
-        return None
+            return json.loads(resp.read().decode()), None
+    except urllib.error.HTTPError as e:
+        return None, f"http_{e.code}"
+    except TimeoutError:
+        return None, "timeout"
+    except urllib.error.URLError as e:
+        return None, f"neterr_{getattr(e, 'reason', '')}".strip("_")
+    except ValueError:
+        return None, "bad_json"
 
 
 def _extract_json(payload: dict | None) -> dict | None:
@@ -71,29 +89,48 @@ def _extract_json(payload: dict | None) -> dict | None:
         return None
 
 
+def _attempt(model: str, api_key: str, body: dict) -> dict | None:
+    """One request body, retried through transient statuses. Records the last
+    failure reason in _LAST_ERROR."""
+    global _LAST_ERROR
+    for i in range(_MAX_ATTEMPTS):
+        payload, err = _post(model, api_key, body)
+        result = _extract_json(payload)
+        if result is not None:
+            _LAST_ERROR = None
+            return result
+        _LAST_ERROR = err or "empty_response"
+        status = int(err[5:]) if err and err.startswith("http_") else None
+        if status in _RETRY_STATUSES and i < _MAX_ATTEMPTS - 1:
+            time.sleep(2 * (i + 1))  # 2s, 4s backoff
+            continue
+        break
+    return None
+
+
 def _gemini(prompt: str, schema: dict) -> dict | None:
-    """One Gemini call. Tries the constrained-enum schema first; if that
-    request fails (e.g. a schema-format quirk), retries as plain JSON with the
-    allowed values still spelled out in the prompt."""
+    """One Gemini classification. Tries the constrained-enum schema first
+    (with retries on rate limits); if that request keeps failing — e.g. a
+    schema-format quirk — falls back to plain JSON with the allowed values
+    still spelled out in the prompt."""
+    global _LAST_ERROR
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
+        _LAST_ERROR = "no_key"
         return None
     model = os.getenv("GEMINI_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
     contents = {"contents": [{"parts": [{"text": prompt}]}]}
 
     with_schema = {
         **contents,
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": schema,
-        },
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": schema},
     }
-    result = _extract_json(_post(model, api_key, with_schema))
+    result = _attempt(model, api_key, with_schema)
     if result is not None:
         return result
 
     plain = {**contents, "generationConfig": {"responseMimeType": "application/json"}}
-    return _extract_json(_post(model, api_key, plain))
+    return _attempt(model, api_key, plain)
 
 
 def _confidence(answer: dict) -> float:
@@ -280,5 +317,6 @@ def diagnose(category: str | None, transcript: str | None, case_summary: str | N
         "gemini_key_set": key_set,
         "model": model,
         "raw_answer": raw,
+        "last_error": None if raw is not None else _LAST_ERROR,
         "validated": {"case_subcategory": subcategory, "case_subtype": subtype},
     }

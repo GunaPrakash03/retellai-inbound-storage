@@ -134,15 +134,14 @@ def debug_classify(call_id: str, store: bool = False):
     row = get_case(call_id)
     if not row:
         raise HTTPException(status_code=404, detail="Case not found")
-    result = classify.diagnose(row.get("transcript"), row.get("case_summary"))
+    category = row.get("case_category")
+    result = classify.diagnose(category, row.get("transcript"), row.get("case_summary"))
     result["case"] = {
         "call_id": call_id,
-        "case_category": row.get("case_category"),
-        "employment": row.get("case_category") == "workplace_employment",
+        "case_category": category,
         "has_transcript": bool(row.get("transcript")),
     }
-    if store and row.get("case_category") == "workplace_employment":
-        v = result["validated"]
+    if store and (v := result["validated"])["case_subcategory"]:
         db.set_classification("cases", call_id, v["case_subcategory"], v["case_subtype"])
         result["stored"] = True
     return result

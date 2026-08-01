@@ -226,3 +226,77 @@ def subtypes_for(category: str | None, case_type: str | None) -> list[tuple[str,
     if category != EMPLOYMENT_CATEGORY:
         return []
     return EMPLOYMENT_SUBTYPES.get(case_type or "", [])
+
+
+# Matter types (case_subcategory) for the nine non-employment areas, as
+# (slug, label). Slugs match validators.VALID_SUBCATEGORIES exactly — some
+# keep stopwords (breach_of_contract, slip_and_fall), so they're written out
+# here rather than derived from the label. These already drive the dashboard
+# and Retell extraction; the classifier reuses them to fill the matter type
+# from the transcript when Retell didn't. Employment's 25 types are separate
+# (EMPLOYMENT_TYPES). No subtypes for these areas yet — see CASE-TAXONOMY.md.
+NON_EMPLOYMENT_SUBCATEGORIES: dict[str, list[tuple[str, str]]] = {
+    "personal_injury": [
+        ("car_accident", "Car Accident"),
+        ("motorcycle_accident", "Motorcycle Accident"),
+        ("truck_accident", "Truck Accident"),
+        ("pedestrian_bicycle_accident", "Pedestrian / Bicycle Accident"),
+        ("slip_and_fall", "Slip and Fall"),
+        ("dog_bite", "Dog Bite"),
+        ("wrongful_death", "Wrongful Death"),
+        ("boating_accident", "Boating Accident"),
+    ],
+    "medical_product": [
+        ("medical_malpractice", "Medical Malpractice"),
+        ("defective_product", "Defective Product"),
+        ("dangerous_drug_device", "Dangerous Drug / Device"),
+    ],
+    "family_law": [
+        ("divorce", "Divorce"),
+        ("child_custody_visitation", "Child Custody and Visitation"),
+        ("child_support", "Child Support"),
+        ("paternity", "Paternity"),
+        ("adoption_guardianship", "Adoption and Guardianship"),
+        ("domestic_violence_protection", "Domestic Violence Protection"),
+        ("emancipation_name_changes", "Emancipation and Name Changes"),
+    ],
+    "criminal_defense": [
+        ("dui_dwi", "DUI / DWI"),
+        ("misdemeanor", "Misdemeanor"),
+        ("felony", "Felony"),
+        ("traffic_violation", "Traffic Violation"),
+        ("juvenile", "Juvenile"),
+    ],
+    "immigration": [
+        ("visa", "Visa"),
+        ("green_card", "Green Card"),
+        ("deportation_removal", "Deportation / Removal"),
+        ("asylum", "Asylum"),
+        ("citizenship_naturalization", "Citizenship / Naturalization"),
+    ],
+    "real_estate_housing": [
+        ("landlord_tenant", "Landlord–Tenant"),
+        ("eviction", "Eviction"),
+        ("purchase_sale_dispute", "Purchase / Sale Dispute"),
+        ("foreclosure", "Foreclosure"),
+    ],
+    "business_contract": [
+        ("breach_of_contract", "Breach of Contract"),
+        ("partnership_dispute", "Partnership Dispute"),
+        ("debt_collection", "Debt Collection"),
+    ],
+    "estate_disability": [
+        ("estate_planning", "Estate Planning"),
+        ("probate", "Probate"),
+        ("social_security_disability", "Social Security Disability"),
+        ("veterans_benefits", "Veterans Benefits"),
+    ],
+}
+
+
+def subcategory_choices(category: str | None) -> list[tuple[str, str]]:
+    """(slug, label) matter-type options for a category — employment's 25
+    types or a non-employment area's list. Empty for 'other' / unknown."""
+    if category == EMPLOYMENT_CATEGORY:
+        return list(EMPLOYMENT_TYPES)
+    return NON_EMPLOYMENT_SUBCATEGORIES.get(category or "", [])

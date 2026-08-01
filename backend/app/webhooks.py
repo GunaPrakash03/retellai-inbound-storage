@@ -8,7 +8,6 @@ from fastapi import APIRouter, BackgroundTasks, Request, Response
 from .classify import classify_and_store
 from .db import find_caller_history, upsert_record
 from .security import verify_signature
-from .taxonomy import EMPLOYMENT_CATEGORY
 from .validators import (
     detect_outcome_from_transcript,
     is_valid_email,
@@ -149,11 +148,12 @@ async def post_call(request: Request, background: BackgroundTasks):
 
         upsert_record(table, row)
 
-        # Completed employment intakes get an LLM pass that fills the finer
-        # taxonomy (case type + subtype). Runs in the background so it never
-        # delays this webhook's response; it's a no-op for other categories
-        # and when no GEMINI_API_KEY is configured. See app/classify.py.
-        if table == "cases" and case_category == EMPLOYMENT_CATEGORY:
+        # Completed intakes get an LLM pass that fills the matter type from the
+        # transcript (and, for employment, the finer subtype). Runs in the
+        # background so it never delays this webhook's response; it's a no-op
+        # for "other", for already-classified cases, and when no
+        # GEMINI_API_KEY is set. See app/classify.py.
+        if table == "cases":
             background.add_task(classify_and_store, "cases", call.get("call_id"))
 
     return Response(status_code=204)

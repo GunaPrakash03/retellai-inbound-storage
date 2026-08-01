@@ -89,6 +89,17 @@ def debug_seed(reset: bool = False):
     return seed_all(reset=reset)
 
 
+@app.post("/debug/purge")
+def debug_purge():
+    """Empty the database — every call bucket, messages, and the lookup audit
+    — leaving no sample data behind, unlike /debug/seed?reset=1 which
+    repopulates. The staff directory is preserved. Destructive and
+    irreversible; DEBUG-gated for that reason."""
+    _require_debug()
+    cleared = db.reset_call_data()
+    return {"purged": True, "cleared": cleared}
+
+
 @app.get("/cases/{call_id}")
 def get_case_detail(call_id: str):
     row = get_case(call_id)

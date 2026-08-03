@@ -139,3 +139,9 @@ export const VIEWS = {
   MESSAGES: "messages",
   STAFF: "staff",
 };
+
+// Category values are snake_case in the database; URLs read better in kebab.
+// Both directions are pure string swaps, so no lookup table can drift out of
+// step with CATEGORIES above.
+export const categoryToSlug = (category) => (category || "").replaceAll("_", "-");
+export const slugToCategory = (slug) => (slug || "").replaceAll("-", "_");

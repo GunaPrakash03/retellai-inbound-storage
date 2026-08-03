@@ -24,6 +24,17 @@ export function getTaxonomy() {
   return request("/taxonomy");
 }
 
+// Cases with a court date, soonest first — the home page's court calendar.
+// Served by a dedicated endpoint so the home page doesn't pull every case
+// (and every transcript) just to find the handful with a hearing.
+export function getHearings({ limit, upcomingOnly } = {}) {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", limit);
+  if (upcomingOnly === false) params.set("upcoming_only", "false");
+  const qs = params.toString();
+  return request(`/hearings${qs ? `?${qs}` : ""}`);
+}
+
 export function listRecords(bucket, { category, status, subcategory, assignedTo, limit } = {}) {
   const params = new URLSearchParams();
   if (category) params.set("category", category);

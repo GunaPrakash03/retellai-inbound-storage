@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maya Intake — Call Test Sheet</title>
+<style>
+:root {
+  --bg:        #F4F6F8;
+  --surface:   #FFFFFF;
+  --surface-2: #EEF1F5;
+  --ink:       #141922;
+  --ink-2:     #3D4757;
+  --muted:     #6B7688;
+  --rule:      #DCE1E8;
+  --rule-firm: #C3CBD6;
+  --accent:    #2B4FD4;
+  --accent-bg: #E7ECFC;
+  --tell:      #8A6100;
+  --tell-bg:   #FBF1DC;
+  --hold:      #B32B45;
+  --hold-bg:   #FBE9EC;
+  --pass:      #10704A;
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --maxw: 60rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #0E1116;
+    --surface:   #161B23;
+    --surface-2: #1D242E;
+    --ink:       #E9EDF3;
+    --ink-2:     #B8C2D0;
+    --muted:     #8996A8;
+    --rule:      #262E3A;
+    --rule-firm: #38424F;
+    --accent:    #8AA0FF;
+    --accent-bg: #1B2340;
+    --tell:      #E3AE4B;
+    --tell-bg:   #2C2413;
+    --hold:      #FF8395;
+    --hold-bg:   #331A20;
+    --pass:      #4FC894;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0E1116; --surface:#161B23; --surface-2:#1D242E; --ink:#E9EDF3; --ink-2:#B8C2D0;
+  --muted:#8996A8; --rule:#262E3A; --rule-firm:#38424F; --accent:#8AA0FF; --accent-bg:#1B2340;
+  --tell:#E3AE4B; --tell-bg:#2C2413; --hold:#FF8395; --hold-bg:#331A20; --pass:#4FC894;
+}
+:root[data-theme="light"] {
+  --bg:#F4F6F8; --surface:#FFFFFF; --surface-2:#EEF1F5; --ink:#141922; --ink-2:#3D4757;
+  --muted:#6B7688; --rule:#DCE1E8; --rule-firm:#C3CBD6; --accent:#2B4FD4; --accent-bg:#E7ECFC;
+  --tell:#8A6100; --tell-bg:#FBF1DC; --hold:#B32B45; --hold-bg:#FBE9EC; --pass:#10704A;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { text-wrap: balance; margin: 0; font-weight: 600; }
+
+/* ---------------------------------------------------------------- masthead */
+.masthead {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule-firm);
+}
+.masthead-in {
+  max-width: var(--maxw); margin: 0 auto; padding: 0.75rem 1.25rem;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+.brand { display: flex; flex-direction: column; gap: 0.1rem; margin-right: auto; }
+.brand h1 { font-size: 1.0625rem; letter-spacing: -0.01em; }
+.brand .sub {
+  font-family: var(--font-mono); font-size: 0.6875rem; color: var(--muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.tally {
+  font-family: var(--font-mono); font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--rule);
+  padding: 0.3rem 0.6rem; border-radius: 3px; color: var(--ink-2);
+}
+.tally b { color: var(--accent); font-weight: 600; }
+.btn {
+  font-family: var(--font-ui); font-size: 0.8125rem; color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--rule-firm);
+  padding: 0.35rem 0.7rem; border-radius: 3px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.meter { height: 2px; background: var(--rule); }
+.meter span {
+  display: block; height: 100%; width: 0%;
+  background: var(--accent); transition: width 0.25s ease;
+}
+
+/* ------------------------------------------------------------------ shell */
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 1.75rem 1.25rem 4rem; }
+.stack { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* ------------------------------------------------------------------ intro */
+.intro {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-top: 2px solid var(--accent);
+  border-radius: 4px; padding: 1.15rem 1.35rem;
+  display: flex; flex-direction: column; gap: 0.85rem;
+}
+.intro p { margin: 0; color: var(--ink-2); max-width: 62ch; }
+.steps { margin: 0; padding-left: 1.15rem; color: var(--ink-2); display: flex; flex-direction: column; gap: 0.3rem; }
+.steps code, .inline-code {
+  font-family: var(--font-mono); font-size: 0.85em;
+  background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 3px;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.key {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 0.25rem 0.55rem; border-radius: 3px;
+}
+.key.tell { background: var(--tell-bg); color: var(--tell); }
+.key.hold { background: var(--hold-bg); color: var(--hold); }
+.key.cap  { background: var(--accent-bg); color: var(--accent); }
+.key-note { font-size: 0.8125rem; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* ------------------------------------------------------------------ cards */
+.case {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 4px; overflow: hidden;
+}
+.case-head {
+  display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap;
+  padding: 0.85rem 1.35rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-2);
+}
+.case-id {
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.05em; color: var(--accent);
+  background: var(--accent-bg); padding: 0.2rem 0.45rem; border-radius: 3px;
+}
+.case-head h2 { font-size: 1rem; letter-spacing: -0.01em; }
+.case-slug {
+  margin-left: auto; font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.case-body { padding: 1.15rem 1.35rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.block { display: flex; flex-direction: column; gap: 0.55rem; }
+.block-label {
+  font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.block-label::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+/* identity — read these aloud verbatim */
+.identity {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  background: var(--surface-2); border: 1px solid var(--rule);
+  border-radius: 3px; padding: 0.85rem 1rem;
+}
+.field { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.field-name {
+  font-size: 0.6875rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+}
+.field-val {
+  font-family: var(--font-mono); font-size: 0.9375rem; color: var(--ink);
+  font-variant-numeric: tabular-nums; word-break: break-word;
+}
+.spell-trap {
+  font-size: 0.75rem; color: var(--hold); font-family: var(--font-ui);
+}
+
+.opener {
+  font-size: 1rem; color: var(--ink); font-style: italic;
+  border-left: 2px solid var(--tell); padding: 0.15rem 0 0.15rem 0.85rem;
+  margin: 0;
+}
+
+/* volunteer list */
+.tell-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.tell-list li {
+  font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-2);
+  padding-left: 1rem; position: relative;
+}
+.tell-list li::before {
+  content: "+"; position: absolute; left: 0; color: var(--tell); font-weight: 700;
+}
+
+/* withhold table — the actual test */
+.hold-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.hold-list li {
+  display: grid; grid-template-columns: minmax(9rem, 15rem) 1fr; gap: 0.5rem 1rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 2px solid var(--hold);
+  background: var(--hold-bg);
+  border-bottom: 1px solid var(--surface);
+}
+.hold-list li:last-child { border-bottom: 0; }
+.hold-q { font-size: 0.8125rem; color: var(--hold); font-weight: 600; }
+.hold-a { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink); }
+@media (max-width: 34rem) {
+  .hold-list li { grid-template-columns: 1fr; gap: 0.2rem; }
+}
+
+/* capture checklist */
+.check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.check-list li { border-bottom: 1px solid var(--rule); }
+.check-list li:last-child { border-bottom: 0; }
+.check-list label {
+  display: flex; align-items: baseline; gap: 0.65rem;
+  padding: 0.45rem 0.2rem; cursor: pointer;
+}
+.check-list input { margin: 0; accent-color: var(--accent); width: 1rem; height: 1rem; flex: none; position: relative; top: 0.15rem; }
+.check-list input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chk-field {
+  font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink);
+  flex: none;
+}
+.chk-note { font-size: 0.8125rem; color: var(--muted); }
+.check-list input:checked ~ .chk-field { color: var(--pass); text-decoration: line-through; text-decoration-color: var(--rule-firm); }
+.check-list input:checked ~ .chk-note { color: var(--rule-firm); }
+.new-tag {
+  font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-bg);
+  padding: 0.1rem 0.3rem; border-radius: 2px; flex: none;
+}
+
+/* ----------------------------------------------------------------- verify */
+.verify {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-top: 2px solid var(--accent);
+  border-radius: 4px; padding: 1.15rem 1.35rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.verify h2 { font-size: 1rem; }
+.verify p { margin: 0; color: var(--ink-2); max-width: 62ch; }
+pre {
+  margin: 0; overflow-x: auto;
+  background: var(--surface-2); border: 1px solid var(--rule);
+  border-radius: 3px; padding: 0.85rem 1rem;
+  font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6;
+  color: var(--ink-2);
+}
+.warn {
+  border-left: 2px solid var(--hold); background: var(--hold-bg);
+  padding: 0.7rem 0.95rem; border-radius: 0 3px 3px 0;
+  font-size: 0.875rem; color: var(--ink-2);
+}
+.warn b { color: var(--hold); }
+
+/* ------------------------------------------------------------------ print */
+@media print {
+  :root { --bg:#fff; --surface:#fff; --surface-2:#fff; --ink:#000; --ink-2:#222; --muted:#555; --rule:#bbb; }
+  .masthead { position: static; }
+  .btn, .meter, .tally { display: none; }
+  .case { break-inside: avoid; border: 1px solid #999; }
+  body { font-size: 11pt; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-in">
+    <div class="brand">
+      <h1>Maya Intake — Call Test Sheet</h1>
+      <span class="sub">10 scenarios &middot; checks whether the agent asks for every detail</span>
+    </div>
+    <span class="tally"><b id="done">0</b> / <span id="total">0</span> captured</span>
+    <button class="btn" id="reset" type="button">Reset</button>
+  </div>
+  <div class="meter"><span id="bar"></span></div>
+</header>
+
+<div class="wrap">
+<div class="stack">
+
+  <section class="intro">
+    <p>
+      Call the intake line and play the caller described in each card. The point of the
+      exercise is <strong>what you don't say</strong>: every fact in the red block is
+      withheld until Maya actually asks for it. If she never asks, that fact never reaches
+      the case record &mdash; and that is the finding.
+    </p>
+    <ol class="steps">
+      <li>Dial the intake number and work one card per call.</li>
+      <li>Volunteer only the amber facts. Answer red facts <em>only</em> when asked.</li>
+      <li>After hangup, wait ~60s for analysis, pull the record (see the bottom of this page), and tick each field that actually landed.</li>
+    </ol>
+    <div class="legend">
+      <span class="key tell">Volunteer</span>
+      <span class="key hold">Withhold until asked</span>
+      <span class="key cap">Must reach the record</span>
+      <span class="key-note">Fields marked <span class="new-tag">new</span> do not exist yet &mdash; expect those to fail until the plan is built.</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ PI-01 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">PI-01</span>
+      <h2>Rear-ended at a stop light</h2>
+      <span class="case-slug">personal_injury / car_accident</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Deepa Krishnamurthy</span><span class="spell-trap">Spell it only if she asks &mdash; she should</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">617 555 0142</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">dkrish@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;I was rear-ended at a stop light two days ago.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>Happened 2026-08-01, around 8am</li>
+          <li>Boston, Massachusetts &mdash; Storrow Drive at the Arlington exit</li>
+          <li>The other driver hit me from behind while I was stopped</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Which part of your body?</span><span class="hold-a">Neck and lower back</span></li>
+          <li><span class="hold-q">Did you get treatment?</span><span class="hold-a">ER visit, released same day</span></li>
+          <li><span class="hold-q">Where / which hospital?</span><span class="hold-a">Mass General</span></li>
+          <li><span class="hold-q">Was an ambulance called?</span><span class="hold-a">Yes, from the scene</span></li>
+          <li><span class="hold-q">Still in pain?</span><span class="hold-a">Yes &mdash; stiff neck, still in physio</span></li>
+          <li><span class="hold-q">Missed any work?</span><span class="hold-a">Three days</span></li>
+          <li><span class="hold-q">Any witnesses?</span><span class="hold-a">A coworker was in my passenger seat</span></li>
+          <li><span class="hold-q">Other driver's insurer?</span><span class="hold-a">Geico</span></li>
+          <li><span class="hold-q">Vehicle / plate?</span><span class="hold-a">Silver pickup, plate 4RTX992</span></li>
+          <li><span class="hold-q">Police report number?</span><span class="hold-a">BPD-2026-88421</span></li>
+          <li><span class="hold-q">Who was the other driver?</span><span class="hold-a">Ray Doucette</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= car_accident</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">incident_date</span><span class="chk-note">= 2026-08-01</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">location</span><span class="chk-note">Boston, MA</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Ray Doucette</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">injured</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">police_report_filed</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">body_parts_injured</span><span class="new-tag">new</span><span class="chk-note">neck, lower back</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">treatment_type</span><span class="new-tag">new</span><span class="chk-note">ER</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">treatment_provider</span><span class="new-tag">new</span><span class="chk-note">Mass General</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">ambulance_called</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">ongoing_symptoms</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">work_missed</span><span class="new-tag">new</span><span class="chk-note">3 days</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">witnesses</span><span class="new-tag">new</span><span class="chk-note">passenger coworker</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">insurance_carrier</span><span class="new-tag">new</span><span class="chk-note">Geico</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">vehicle_info</span><span class="new-tag">new</span><span class="chk-note">4RTX992</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">police_report_number</span><span class="new-tag">new</span><span class="chk-note">BPD-2026-88421</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ EMP-02 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">EMP-02</span>
+      <h2>Fired after reporting safety violations</h2>
+      <span class="case-slug">workplace_employment / wrongful_termination</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Marcus Oyelaran</span><span class="spell-trap">Surname mis-hears as &ldquo;O'Leron&rdquo;</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">312 555 0198</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">m.oyelaran@outlook.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;I was let go a month after I reported my manager for safety violations.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>Employer is Vantage Logistics, in Chicago</li>
+          <li>Terminated 2026-06-30</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Your job title?</span><span class="hold-a">Warehouse shift lead</span></li>
+          <li><span class="hold-q">How long there?</span><span class="hold-a">Four years</span></li>
+          <li><span class="hold-q">Reported to HR?</span><span class="hold-a">Yes &mdash; written complaint to HR</span></li>
+          <li><span class="hold-q">When did you report it?</span><span class="hold-a">2026-05-12</span></li>
+          <li><span class="hold-q">Still employed there?</span><span class="hold-a">No, terminated</span></li>
+          <li><span class="hold-q">Workers' comp claim?</span><span class="hold-a">No, never filed one</span></li>
+          <li><span class="hold-q">Any documentation?</span><span class="hold-a">Yes &mdash; I kept the emails</span></li>
+          <li><span class="hold-q">Any witnesses?</span><span class="hold-a">Two coworkers on my shift</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= wrongful_termination</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">case_subtype</span><span class="chk-note">= retaliatory_termination</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Vantage Logistics</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">incident_date</span><span class="chk-note">= 2026-06-30</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">job_title</span><span class="new-tag">new</span><span class="chk-note">warehouse shift lead</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">employment_length</span><span class="new-tag">new</span><span class="chk-note">4 years</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">reported_internally</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">reported_date</span><span class="new-tag">new</span><span class="chk-note">2026-05-12</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">still_employed</span><span class="new-tag">new</span><span class="chk-note">false</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">workers_comp_filed</span><span class="new-tag">new</span><span class="chk-note">false</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">documentation_exists</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">witnesses</span><span class="new-tag">new</span><span class="chk-note">two coworkers</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ MED-03 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">MED-03</span>
+      <h2>Failed hip implant, revision surgery</h2>
+      <span class="case-slug">medical_product / dangerous_drug_device</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Ruth Ann Delacroix</span><span class="spell-trap">Two-word first name &mdash; often collapsed</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">504 555 0176</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">radelacroix@yahoo.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;I had a hip implant that failed and I needed a second surgery.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>Original surgery was in 2024, the implant failed this June</li>
+          <li>New Orleans, Louisiana</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Name of the device?</span><span class="hold-a">Stryker Accolade hip stem</span></li>
+          <li><span class="hold-q">Which part of your body?</span><span class="hold-a">Right hip</span></li>
+          <li><span class="hold-q">What treatment followed?</span><span class="hold-a">Revision surgery, five days admitted</span></li>
+          <li><span class="hold-q">Which hospital?</span><span class="hold-a">St. Luke's</span></li>
+          <li><span class="hold-q">Still having problems?</span><span class="hold-a">Yes &mdash; I walk with a cane now</span></li>
+          <li><span class="hold-q">Missed work?</span><span class="hold-a">Six weeks</span></li>
+          <li><span class="hold-q">Manufacturer?</span><span class="hold-a">Stryker</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_category</span><span class="chk-note">= medical_product</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= dangerous_drug_device</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Stryker</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">injured</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">product_name</span><span class="new-tag">new</span><span class="chk-note">Accolade hip stem</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">body_parts_injured</span><span class="new-tag">new</span><span class="chk-note">right hip</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">treatment_type</span><span class="new-tag">new</span><span class="chk-note">surgery / admitted</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">treatment_provider</span><span class="new-tag">new</span><span class="chk-note">St. Luke's</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">ongoing_symptoms</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">work_missed</span><span class="new-tag">new</span><span class="chk-note">6 weeks</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ FAM-04 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">FAM-04</span>
+      <h2>Divorce with a custody worry</h2>
+      <span class="case-slug">family_law / divorce</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Ana Sofia Restrepo</span><span class="spell-trap">Two given names &mdash; both belong on the record</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">305 555 0164</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">asrestrepo@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;I want to file for divorce and I'm worried about custody.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>We separated in March, I'm in Miami, Florida</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Children involved?</span><span class="hold-a">Yes</span></li>
+          <li><span class="hold-q">How many, what ages?</span><span class="hold-a">Two &mdash; ages 7 and 11</span></li>
+          <li><span class="hold-q">Other party's name?</span><span class="hold-a">Daniel Restrepo</span></li>
+          <li><span class="hold-q">Any court date set?</span><span class="hold-a">Hearing on 2026-09-15</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= divorce</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Daniel Restrepo</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">key_date_or_deadline</span><span class="chk-note">2026-09-15</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">children_involved</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">children_count</span><span class="new-tag">new</span><span class="chk-note">2 (ages 7, 11)</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ CRIM-05 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">CRIM-05</span>
+      <h2>Son arrested overnight, still in custody</h2>
+      <span class="case-slug">criminal_defense / dui_dwi</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Tyrell Beauchamp</span><span class="spell-trap">&ldquo;Beauchamp&rdquo; sounds like &ldquo;Beecham&rdquo;</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">216 555 0133</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">tbeauchamp@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;My son was arrested last night and he's still being held.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>Arrested 2026-08-02, late evening</li>
+          <li>I'm calling on his behalf &mdash; he's the one who needs the lawyer</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Is he in custody now?</span><span class="hold-a">Yes &mdash; still at the county jail</span></li>
+          <li><span class="hold-q">Bail or bond?</span><span class="hold-a">Set at $5,000, not posted yet</span></li>
+          <li><span class="hold-q">What are the charges?</span><span class="hold-a">DUI and an open container count</span></li>
+          <li><span class="hold-q">Which court?</span><span class="hold-a">Cuyahoga County Municipal Court</span></li>
+          <li><span class="hold-q">Arraignment date?</span><span class="hold-a">2026-08-05, 9am</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= dui_dwi</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">incident_date</span><span class="chk-note">= 2026-08-02</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">key_date_or_deadline</span><span class="chk-note">2026-08-05 arraignment</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">in_custody</span><span class="new-tag">new</span><span class="chk-note">true &mdash; should be visible at a glance</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">bail_status</span><span class="new-tag">new</span><span class="chk-note">$5,000 not posted</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">charges</span><span class="new-tag">new</span><span class="chk-note">DUI, open container</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">court_name</span><span class="new-tag">new</span><span class="chk-note">Cuyahoga County Municipal</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ IMM-06 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">IMM-06</span>
+      <h2>Removal hearing notice received</h2>
+      <span class="case-slug">immigration / deportation_removal</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Mai Nguyen</span><span class="spell-trap">Confirm which name is the surname</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">714 555 0189</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">mainguyen@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;I got a notice about a removal hearing and I don't know what to do.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>The notice came last week</li>
+          <li>I live in Santa Ana, California</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Country of origin?</span><span class="hold-a">Vietnam</span></li>
+          <li><span class="hold-q">Current status?</span><span class="hold-a">Student visa, expired last year</span></li>
+          <li><span class="hold-q">Are you detained?</span><span class="hold-a">No, I'm at home</span></li>
+          <li><span class="hold-q">Hearing date?</span><span class="hold-a">2026-10-02</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= deportation_removal</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">key_date_or_deadline</span><span class="chk-note">2026-10-02</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">country_of_origin</span><span class="new-tag">new</span><span class="chk-note">Vietnam</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">immigration_status</span><span class="new-tag">new</span><span class="chk-note">expired student visa</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">detained</span><span class="new-tag">new</span><span class="chk-note">false</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ HOUS-07 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">HOUS-07</span>
+      <h2>Eviction notice from a landlord</h2>
+      <span class="case-slug">real_estate_housing / eviction</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Obadiah Fitzwilliam</span><span class="spell-trap">Long on both halves &mdash; she must spell-check</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">857 555 0121</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">ofitzwilliam@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;My landlord is trying to evict me and I got a notice on my door.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>I've lived there three years</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Property address?</span><span class="hold-a">44 Pearl St, Apt 3B, Somerville MA</span></li>
+          <li><span class="hold-q">Landlord's name?</span><span class="hold-a">Hillcrest Property Group</span></li>
+          <li><span class="hold-q">What notice, and when?</span><span class="hold-a">14-day notice to quit, received 2026-07-28</span></li>
+          <li><span class="hold-q">Monthly rent?</span><span class="hold-a">$1,850</span></li>
+          <li><span class="hold-q">Written lease?</span><span class="hold-a">Was written, expired &mdash; month-to-month now</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= eviction</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">location</span><span class="chk-note">full street address, not just city</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Hillcrest Property Group</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">key_date_or_deadline</span><span class="chk-note">2026-07-28 + 14 days</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">notice_type</span><span class="new-tag">new</span><span class="chk-note">14-day notice to quit</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">monthly_rent</span><span class="new-tag">new</span><span class="chk-note">$1,850</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">lease_type</span><span class="new-tag">new</span><span class="chk-note">month-to-month</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ BUS-08 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">BUS-08</span>
+      <h2>Client hasn't paid an invoice</h2>
+      <span class="case-slug">business_contract / breach_of_contract</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Priyanka Venkataraman</span><span class="spell-trap">Long surname &mdash; the classic merge failure</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">408 555 0155</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">priyanka.v@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;A client hasn't paid us for work we finished back in March.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>We're a design studio in San Jose, California</li>
+          <li>Work was delivered and accepted</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Who is the other party?</span><span class="hold-a">Brightline Media LLC</span></li>
+          <li><span class="hold-q">Contract in writing?</span><span class="hold-a">Yes, signed 2026-01-15</span></li>
+          <li><span class="hold-q">Amount in dispute?</span><span class="hold-a">$47,500</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= breach_of_contract</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">opposing_party</span><span class="chk-note">Brightline Media LLC</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">incident_date</span><span class="chk-note">= 2026-01-15</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">contract_written</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">amount_in_dispute</span><span class="new-tag">new</span><span class="chk-note">$47,500</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ EST-09 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">EST-09</span>
+      <h2>Father died, needs help with the estate</h2>
+      <span class="case-slug">estate_disability / probate</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Eleanor Whitcombe-Hayes</span><span class="spell-trap">Hyphenated &mdash; the hyphen must survive</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">919 555 0147</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">e.whitcombehayes@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Opening line</div>
+        <p class="opener">&ldquo;My father passed away and I need help sorting out his estate.&rdquo;</p>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>He lived in Raleigh, North Carolina</li>
+          <li>I'm the only child</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Name of the deceased?</span><span class="hold-a">Harold Whitcombe</span></li>
+          <li><span class="hold-q">Date of death?</span><span class="hold-a">2026-06-11</span></li>
+          <li><span class="hold-q">Is there a will?</span><span class="hold-a">Yes, he left one</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Must reach the record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">case_subcategory</span><span class="chk-note">= probate</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">incident_date</span><span class="chk-note">= 2026-06-11 (date of death)</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">decedent_name</span><span class="new-tag">new</span><span class="chk-note">Harold Whitcombe</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">will_exists</span><span class="new-tag">new</span><span class="chk-note">true</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ EDGE-10 -->
+  <article class="case">
+    <div class="case-head">
+      <span class="case-id">EDGE-10</span>
+      <h2>Edge case &mdash; incident outside the US</h2>
+      <span class="case-slug">jurisdiction &mdash; behavior undecided</span>
+    </div>
+    <div class="case-body">
+      <div class="block">
+        <div class="block-label">What this one is for</div>
+        <p class="opener" style="border-left-color: var(--hold); font-style: normal;">
+          This repeats the real 2026-08-03 call: a bicycle accident in Tamil Nadu, India, which
+          routed into <span class="inline-code">cases</span> as an ordinary US intake. There is
+          no jurisdiction check anywhere in the prompt. Run it to capture current behavior &mdash;
+          then decide what it <em>should</em> do.
+        </p>
+      </div>
+      <div class="block">
+        <div class="block-label">Identity &mdash; read aloud exactly</div>
+        <div class="identity">
+          <div class="field"><span class="field-name">Name</span><span class="field-val">Guna Prakash</span><span class="spell-trap">Merges into &ldquo;Gunaprakash&rdquo; &mdash; the original failure</span></div>
+          <div class="field"><span class="field-name">Phone</span><span class="field-val">+91 93459 96508</span></div>
+          <div class="field"><span class="field-name">Email</span><span class="field-val">guna@gmail.com</span></div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-label">Volunteer freely</div>
+        <ul class="tell-list">
+          <li>Hit by a car while riding my bicycle near my house</li>
+          <li>2026-08-02, around 5pm, in Tamil Nadu, India</li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Withhold until asked</div>
+        <ul class="hold-list">
+          <li><span class="hold-q">Vehicle details?</span><span class="hold-a">TN76 E 9999, owner Alex</span></li>
+          <li><span class="hold-q">Police report?</span><span class="hold-a">Filed, but I don't know the number</span></li>
+          <li><span class="hold-q">Which part of your body?</span><span class="hold-a">Left knee and shoulder</span></li>
+          <li><span class="hold-q">Treatment?</span><span class="hold-a">A local clinic, same day</span></li>
+        </ul>
+      </div>
+      <div class="block">
+        <div class="block-label">Observe and record</div>
+        <ul class="check-list">
+          <li><label><input type="checkbox"><span class="chk-field">caller_name</span><span class="chk-note">exactly &ldquo;Guna Prakash&rdquo;, not merged</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">callback_phone</span><span class="chk-note">10 digits + country code intact</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">vehicle_info</span><span class="new-tag">new</span><span class="chk-note">TN76 E 9999 as a field, not prose</span></label></li>
+          <li><label><input type="checkbox"><span class="chk-field">bucket</span><span class="chk-note">note where it landed &mdash; cases or out_of_scope_calls</span></label></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- ============================================================ verify -->
+  <section class="verify">
+    <h2>After each call &mdash; pull the record</h2>
+    <p>
+      Wait about 60 seconds after hangup for the post-call analysis to finish, then fetch the
+      newest case and read off which fields actually populated:
+    </p>
+<pre>curl -s https://retellai-inbound-storage-production-a24a.up.railway.app/cases \
+  | python3 -c "
+import json,sys
+r = json.load(sys.stdin)[0]
+for k, v in r.items():
+    if k != 'transcript':
+        print(f'{k:24} {v!r}')
+"</pre>
+    <p>
+      Anything you gave that isn't on its own line has been flattened into
+      <span class="inline-code">additional_details</span> or lost. That is exactly the
+      measurement this sheet exists to produce.
+    </p>
+    <div class="warn">
+      <b>Before testing:</b> <span class="inline-code">DEBUG_ENDPOINTS=1</span> is currently
+      live in production, which leaves <span class="inline-code">/debug/purge</span> and full
+      call transcripts reachable without authentication. Turn it off once you've finished this
+      round of testing.
+    </div>
+  </section>
+
+</div>
+</div>
+
+<script>
+(function () {
+  var KEY = 'maya-test-sheet-v1';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.check-list input'));
+  var doneEl = document.getElementById('done');
+  var totalEl = document.getElementById('total');
+  var barEl = document.getElementById('bar');
+
+  totalEl.textContent = boxes.length;
+
+  function load() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+      boxes.forEach(function (b, i) { b.checked = !!saved[i]; });
+    } catch (e) { /* first run, or storage unavailable */ }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(boxes.map(function (b) { return b.checked ? 1 : 0; })));
+    } catch (e) { /* storage unavailable — progress just won't persist */ }
+  }
+
+  function render() {
+    var n = boxes.filter(function (b) { return b.checked; }).length;
+    doneEl.textContent = n;
+    barEl.style.width = boxes.length ? (n / boxes.length * 100) + '%' : '0%';
+  }
+
+  boxes.forEach(function (b) {
+    b.addEventListener('change', function () { save(); render(); });
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    boxes.forEach(function (b) { b.checked = false; });
+    save();
+    render();
+  });
+
+  load();
+  render();
+})();
+</script>
+
+</body>
+</html>

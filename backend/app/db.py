@@ -307,6 +307,38 @@ def list_records(
     return [dict(r) for r in rows]
 
 
+def list_hearings(limit: int = 100, upcoming_only: bool = True, today: str | None = None) -> list[dict]:
+    """Cases with a court date, soonest first — the home page's court calendar.
+
+    Only the `cases` bucket: a hearing belongs to a matter the firm has taken
+    on, and the other buckets are calls that never became one. Dates are stored
+    as ISO YYYY-MM-DD strings, so a lexicographic compare is also a
+    chronological one; anything stored in another shape sorts to the end rather
+    than being dropped, so a bad date stays visible instead of silently
+    vanishing from the calendar.
+    """
+    query = (
+        "SELECT * FROM cases "
+        "WHERE next_hearing_date IS NOT NULL AND TRIM(next_hearing_date) != ''"
+    )
+    params: dict = {}
+    if upcoming_only:
+        # "Upcoming" deliberately includes today itself. An unparseable date
+        # yields NULL from date(), and NULL >= anything is falsy — so it is
+        # kept explicitly rather than being filtered out, or a hearing typed in
+        # the wrong format would disappear from the calendar with no trace.
+        query += (
+            " AND (date(next_hearing_date) IS NULL"
+            " OR date(next_hearing_date) >= date(:today))"
+        )
+        params["today"] = today or "now"
+    query += " ORDER BY date(next_hearing_date) IS NULL, date(next_hearing_date) ASC LIMIT :limit"
+    params["limit"] = limit
+
+    rows = _conn.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+
 def count_cases_by_category() -> dict[str, int]:
     """How many completed cases sit under each category, for the home page's
     category list. Only the `cases` bucket — the other buckets aren't sorted

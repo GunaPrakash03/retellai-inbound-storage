@@ -395,6 +395,32 @@ def get_lookup_audit(limit: int = 100):
     return db.list_lookup_audit(limit=limit)
 
 
+@app.get("/hearings")
+def get_hearings(limit: int = 100, upcoming_only: bool = True):
+    """Cases with a court date, soonest first — the home page's court calendar.
+
+    Declared above the generic /{bucket} routes so it isn't read as a bucket
+    name. Returns only the fields the calendar renders, so the home page
+    doesn't pull whole transcripts it will never show.
+    """
+    rows = db.list_hearings(limit=limit, upcoming_only=upcoming_only)
+    return [
+        {
+            "call_id": r.get("call_id"),
+            "case_number": r.get("case_number"),
+            "caller_name": r.get("caller_name"),
+            "case_category": r.get("case_category"),
+            "case_subcategory": r.get("case_subcategory"),
+            "next_hearing_date": r.get("next_hearing_date"),
+            "hearing_attorney": r.get("hearing_attorney"),
+            "court_status": r.get("court_status"),
+            "court_status_updated": r.get("court_status_updated"),
+            "status": r.get("status"),
+        }
+        for r in rows
+    ]
+
+
 # Other call buckets, keyed by URL-friendly name -> table name. "cases" keeps
 # its own dedicated routes above for backward compatibility. These generic
 # routes are declared last so they never shadow a literal path above them.

@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Request, Response
 
 from .classify import classify_and_store
-from .db import find_caller_history, upsert_record
+from .db import find_caller_history, find_staff_phone, staff_directory_line, upsert_record
 from .security import verify_signature
 from .validators import (
     detect_outcome_from_transcript,
@@ -34,6 +34,13 @@ async def inbound(request: Request):
     history = find_caller_history(from_number) if from_number else []
     most_recent = history[0] if history else None
 
+    # Who, if anyone, this caller's matter is already assigned to. Resolved
+    # to a number here rather than in Retell so the directory lives in one
+    # place: edit a person in the dashboard and the next call routes to the
+    # new number, with nothing to change in the Retell console.
+    assigned_to = (most_recent or {}).get("assigned_to") or ""
+    assigned_phone = find_staff_phone(assigned_to) or ""
+
     # Dynamic variables must always be strings — a partial call has no
     # category or summary on file (NULL in the DB), and letting a JSON null
     # or the text "None" through would end up spoken in the greeting.
@@ -43,6 +50,15 @@ async def inbound(request: Request):
                 "caller_known": "true" if most_recent else "false",
                 "previous_case_category": (most_recent or {}).get("case_category") or "",
                 "previous_case_summary": (most_recent or {}).get("case_summary") or "",
+                "previous_case_number": (most_recent or {}).get("case_number") or "",
+                # Blank when the matter is unassigned, or when the assigned
+                # name has no active directory entry — the routing prompt
+                # treats an empty destination as "don't transfer", which is
+                # the safe reading of "we don't know who to put you through
+                # to".
+                "assigned_attorney": assigned_to if assigned_phone else "",
+                "assigned_attorney_phone": assigned_phone,
+                "staff_directory": staff_directory_line(),
             }
         }
     }

@@ -593,6 +593,49 @@ def get_staff(staff_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def find_staff_phone(name: str | None) -> str | None:
+    """The dialable number for a staff member, matched by name.
+
+    Case- and whitespace-insensitive because `assigned_to` is free text typed
+    by staff in the dashboard, while the directory is a separate table — the
+    two drift on capitalisation alone. Inactive staff are excluded: someone
+    who has left should never be a transfer destination, even if their name
+    is still on an old case.
+    """
+    if not name or not name.strip():
+        return None
+    row = _conn.execute(
+        "SELECT phone FROM staff"
+        " WHERE active = 1 AND LOWER(TRIM(name)) = LOWER(TRIM(:n))"
+        " AND phone IS NOT NULL AND TRIM(phone) != ''",
+        {"n": name},
+    ).fetchone()
+    return row["phone"] if row else None
+
+
+def staff_directory_line() -> str:
+    """The active staff directory as one line, for Retell's transfer routing.
+
+    Retell dynamic variables must be strings, so the directory is flattened
+    to "Name (role): +number; ..." and read by the routing prompt. Keeping it
+    here means the numbers live in one place — edit a person in the dashboard
+    and the next call routes to the new number, with nothing to change in
+    Retell.
+
+    Anyone without a phone number is left out rather than listed with a blank,
+    so the agent can't offer a transfer that has nowhere to go.
+    """
+    rows = _conn.execute(
+        "SELECT name, role, phone FROM staff"
+        " WHERE active = 1 AND phone IS NOT NULL AND TRIM(phone) != ''"
+        " ORDER BY name"
+    ).fetchall()
+    return "; ".join(
+        f"{r['name']}" + (f" ({r['role']})" if r["role"] else "") + f": {r['phone']}"
+        for r in rows
+    )
+
+
 def create_staff(name: str, role: str | None, phone: str | None, extension: str | None) -> dict:
     staff_id = str(uuid.uuid4())
     _conn.execute(
@@ -734,9 +777,13 @@ def find_caller_history(from_number: str, limit: int = 5) -> list[dict]:
     call dropped early sits in partial_calls, and someone who hit the safety
     branch sits in emergency_flags. Looking only at `cases` would greet both
     as first-time callers.
+
+    `assigned_to` comes along so the inbound webhook can route a returning
+    caller to the attorney already on their matter.
     """
     union = " UNION ALL ".join(
-        f"SELECT id, case_category, case_summary, created_at, '{t}' AS bucket "
+        f"SELECT id, case_category, case_summary, assigned_to, case_number, "
+        f"created_at, '{t}' AS bucket "
         f"FROM {t} WHERE from_number = :from_number"
         for t in BUCKETS
     )

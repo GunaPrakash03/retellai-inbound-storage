@@ -203,6 +203,43 @@ scripted closing lines in the transcript (see "Call buckets" above);
 `call_outcome` is only consulted as a fallback for "unwanted"/"spam" when the
 transcript is missing.
 
+## Custom functions to register in Retell
+
+Agent editor → **Functions / Tools → Add → Custom Function**. All three
+endpoints accept either payload mode (`{name, call, args}` or bare args), so
+the mode setting doesn't matter.
+
+| Name | Endpoint | Parameters | What it's for |
+|---|---|---|---|
+| `check_phone_number` | `POST /validate-phone` | `{"phone": "<what the caller said, verbatim>"}` | Counts and validates the callback number. |
+| `take_message` | `POST /messages` | `{"message_text": "...", "caller_name": "...", "callback_phone": "..."}` | Records a message when a transfer doesn't connect. |
+| `lookup_case_status` | `POST /case-lookup` | `{"case_number": "...", "caller_name": "..."}` | Court status for an existing case. |
+
+**`check_phone_number` is not optional.** Counting digits is the one thing a
+voice agent reliably gets wrong: on a live call it counted a correct
+ten-digit number as nine, told the caller so, made them repeat it three
+times, then counted the same digits again and got ten. Six turns, and the
+caller was told their own number was wrong. The prompt now forbids counting
+and tells the agent to send what it heard here and read back the `say` line
+that comes back. It accepts spoken digits ("nine one two three…") as well as
+figures, and answers:
+
+```json
+{"ok": true, "digit_count": 10, "national_number": "9123456789",
+ "country_code": "1", "e164": "+19123456789", "readback": "9-1-2-3-4-5-6-7-8-9",
+ "say": "That's 10 digits. Read it back as 9-1-2-3-4-5-6-7-8-9 and ask them to confirm."}
+```
+
+A short number comes back `ok: false` with a `say` line naming how many
+digits are missing. Country codes are handled by stripping a 1-3 digit
+prefix when that leaves exactly 10 national digits.
+
+`take_message` requires `message_text`. Called with no arguments it returns a
+422 whose `detail` tells the agent what to collect, rather than a schema
+error — a live call ended with the caller promised a callback that was never
+recorded, because the 422 came back as an opaque failure and the agent said
+"I've got that down" anyway.
+
 ## Signature verification
 
 Every `/webhooks/retell` request must carry a valid `x-retell-signature`

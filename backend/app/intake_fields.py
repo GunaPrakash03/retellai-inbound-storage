@@ -105,8 +105,10 @@ CORE_FIELDS: list[Field] = [
        "True if a whistleblower caller chose not to give details and only name, "
        "number, email, and employer or industry were taken"),
     _b("emergency_flagged", "Emergency flagged",
-       "True only if the safety branch actually fired — the caller was told to "
-       "hang up and call 911, or a whistleblower said they were in danger"),
+       "True only if the caller raised something dangerous happening right then — "
+       "they were told to hang up and call 911, or a whistleblower said they were "
+       "in physical danger. There is no safety question on the call, so this is "
+       "never true just because the matter itself is serious"),
     _t("additional_details", "Additional details",
        "Anything relevant that no other field covers"),
 ]

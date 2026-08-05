@@ -9,6 +9,7 @@ import json
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 
 from . import db, intake_fields
 from .db import get_case, get_record, list_cases, list_records, update_record_status, update_status
@@ -23,7 +24,7 @@ from .schemas import (
     StatusUpdate,
 )
 from .security import SlidingWindowLimiter, verify_signature
-from .validators import name_matches
+from .validators import check_phone, name_matches
 from .webhooks import _last_attempt, router as webhook_router
 
 app = FastAPI(title="Retell Intake Backend")
@@ -249,8 +250,50 @@ def get_messages(delivered: bool | None = None, limit: int = 100):
     return db.list_messages(delivered=delivered, limit=limit)
 
 
+def _retell_args(payload: dict) -> tuple[dict, str | None]:
+    """Unwrap a Retell custom-function body.
+
+    Retell sends `{name, call, args}` when a function is registered in one
+    payload mode and the bare arguments in the other, and which one you get
+    isn't obvious from the console. Accepting both is what keeps a live call
+    from failing on a configuration detail. Returns (args, call_id).
+    """
+    if isinstance(payload.get("args"), dict):
+        return payload["args"], (payload.get("call") or {}).get("call_id")
+    return payload, payload.get("call_id")
+
+
 @app.post("/messages", status_code=201)
-def post_message(body: MessageCreate):
+async def post_message(request: Request):
+    """Record a message for a staff member.
+
+    Called by the dashboard with a flat body, and by the voice agent as the
+    `take_message` custom function — which is why the body is parsed by hand
+    rather than bound to MessageCreate. A live call ended with a 422 here
+    because Retell wrapped the arguments as `{name, call, args}` and the
+    model, having no arguments to send, sent `args: {}`; the caller was
+    promised a callback that was never recorded. A missing message now comes
+    back as an instruction the agent can act on instead of a schema error.
+    """
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Body must be a JSON object")
+
+    args, wrapper_call_id = _retell_args(payload)
+    try:
+        body = MessageCreate(**{**args, "call_id": args.get("call_id") or wrapper_call_id})
+    except ValidationError:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "message_text is required — ask the caller what they'd like passed "
+                "on, and who it's for, then call this again with that text."
+            ),
+        )
+
     # A message for a staff member who doesn't exist would sit in the queue
     # addressed to nobody — the join shows a blank name and it's never
     # delivered. Reject it so the caller (agent or dashboard) can recover.
@@ -264,6 +307,30 @@ def post_message(body: MessageCreate):
         callback_phone=body.callback_phone,
         for_staff_id=body.for_staff_id,
     )
+
+
+@app.post("/validate-phone")
+async def validate_phone(request: Request):
+    """Count and check a callback number for the agent, mid-call.
+
+    Registered in Retell as the `check_phone_number` custom function. The
+    agent sends what it heard — "nine one two three..." or "912-345-6789" —
+    and reads back the `say` line rather than counting digits itself, which
+    is the one thing it demonstrably cannot do reliably. See
+    validators.check_phone.
+
+    Unauthenticated like the rest of the API: it holds no data, reads
+    nothing, and writes nothing, so there is nothing here to protect.
+    """
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Body must be a JSON object")
+
+    args, _ = _retell_args(payload)
+    return check_phone(args.get("phone") or args.get("callback_phone"))
 
 
 @app.patch("/messages/{message_id}")

@@ -150,6 +150,107 @@ def is_valid_email(email: str | None) -> bool | None:
     return bool(_EMAIL_RE.match(email.strip()))
 
 
+# Spoken digits, because the agent passes on what it heard and a caller
+# reading a number out loud produces words, not figures. "oh" for zero is
+# how people actually say it.
+_SPOKEN_DIGITS = {
+    "zero": "0", "oh": "0", "o": "0", "nought": "0",
+    "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+    "six": "6", "seven": "7", "eight": "8", "nine": "9",
+}
+
+# Longest country code we'll strip to leave a 10-digit national number.
+_MAX_COUNTRY_CODE = 3
+
+
+def digits_from_spoken(value: str | None) -> str:
+    """Every digit in a spoken or written number, in order.
+
+    Handles "nine one two", "912-345-6789", and "9123456789" alike. Words are
+    converted first, then everything that isn't a digit is dropped.
+    """
+    if not value:
+        return ""
+    tokens = re.split(r"[^a-z0-9]+", str(value).lower())
+    out = []
+    for token in tokens:
+        if not token:
+            continue
+        if token in _SPOKEN_DIGITS:
+            out.append(_SPOKEN_DIGITS[token])
+        else:
+            out.extend(c for c in token if c.isdigit())
+    return "".join(out)
+
+
+def check_phone(value: str | None) -> dict:
+    """Count and validate a callback number, and say how to read it back.
+
+    This exists because counting is exactly what a voice agent is worst at.
+    On a live call the agent counted "9 1 2 3 4 5 6 7 8 9" as nine digits,
+    told the caller so, made them repeat it three times, then counted the
+    same digits again and got ten — six wasted turns and a caller being told
+    their own phone number was wrong. Counting is arithmetic, so it belongs
+    on this side of the line: the agent passes on what it heard and reads
+    back whatever comes back.
+
+    The prompt's rule is a 10-digit national number with an optional country
+    code, so 11-13 digits are accepted when stripping a 1-3 digit prefix
+    leaves exactly 10.
+    """
+    digits = digits_from_spoken(value)
+    count = len(digits)
+
+    if count == 0:
+        return {
+            "ok": False,
+            "problem": "no_digits",
+            "digit_count": 0,
+            "say": "I didn't catch any digits there. Ask them for the number again, slowly.",
+        }
+
+    country_code, national = "1", digits
+    if count > 10:
+        extra = count - 10
+        if extra <= _MAX_COUNTRY_CODE:
+            country_code, national = digits[:extra], digits[extra:]
+        else:
+            return {
+                "ok": False,
+                "problem": "too_long",
+                "digit_count": count,
+                "say": (
+                    f"That came to {count} digits, which is too many even with a "
+                    "country code. Ask them to give the number again, slowly, one "
+                    "digit at a time."
+                ),
+            }
+    elif count < 10:
+        short_by = 10 - count
+        return {
+            "ok": False,
+            "problem": "too_short",
+            "digit_count": count,
+            "say": (
+                f"That came to {count} digits and I need 10, so {short_by} "
+                f"{'digit is' if short_by == 1 else 'digits are'} missing. Ask them "
+                "to give the whole number again, slowly, one digit at a time."
+            ),
+        }
+
+    readback = "-".join(national)
+    return {
+        "ok": True,
+        "problem": None,
+        "digit_count": 10,
+        "national_number": national,
+        "country_code": country_code,
+        "e164": f"+{country_code}{national}",
+        "readback": readback,
+        "say": f"That's 10 digits. Read it back as {readback} and ask them to confirm.",
+    }
+
+
 # Thresholds for matching a caller's spoken name against the name on file.
 # Whole-name comparison ignores spacing, so it is the looser of the two; a
 # single name part is much shorter, where a small edit is proportionally a

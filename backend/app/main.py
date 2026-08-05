@@ -324,13 +324,17 @@ async def validate_phone(request: Request):
     """
     try:
         payload = await request.json()
-        if not isinstance(payload, dict):
-            raise ValueError
+        args, _ = _retell_args(payload) if isinstance(payload, dict) else ({}, None)
     except ValueError:
-        raise HTTPException(status_code=422, detail="Body must be a JSON object")
+        args = {}
 
-    args, _ = _retell_args(payload)
-    return check_phone(args.get("phone") or args.get("callback_phone"))
+    # Also read the query string. Retell's function editor has a Query
+    # Parameters box sitting right above the Parameters one, and putting the
+    # number in the wrong box would otherwise fail silently on every call —
+    # an empty body reads as "no digits heard", which looks like a caller
+    # problem rather than a configuration one.
+    number = args.get("phone") or args.get("callback_phone") or request.query_params.get("phone")
+    return check_phone(number)
 
 
 @app.patch("/messages/{message_id}")

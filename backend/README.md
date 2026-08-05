@@ -209,11 +209,50 @@ Agent editor → **Functions / Tools → Add → Custom Function**. All three
 endpoints accept either payload mode (`{name, call, args}` or bare args), so
 the mode setting doesn't matter.
 
-| Name | Endpoint | Parameters | What it's for |
-|---|---|---|---|
-| `check_phone_number` | `POST /validate-phone` | `{"phone": "<what the caller said, verbatim>"}` | Counts and validates the callback number. |
-| `take_message` | `POST /messages` | `{"message_text": "...", "caller_name": "...", "callback_phone": "..."}` | Records a message when a transfer doesn't connect. |
-| `lookup_case_status` | `POST /case-lookup` | `{"case_number": "...", "caller_name": "..."}` | Court status for an existing case. |
+| Name | Endpoint | What it's for |
+|---|---|---|
+| `check_phone_number` | `POST /validate-phone` | Counts and validates the callback number. |
+| `take_message` | `POST /messages` | Records a message when a transfer doesn't connect. |
+| `lookup_case_status` | `POST /case-lookup` | Court status for an existing case. |
+
+Each function's arguments go in the editor's **Parameters** box as a JSON
+schema — *not* the **Query Parameters** box just above it, which sends fixed
+values the model never fills in. Set the timeout to about 5000 ms; these are
+local lookups that answer in milliseconds, and the default two minutes is two
+minutes of silence on a live call if anything goes wrong.
+
+`check_phone_number`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "phone": {
+      "type": "string",
+      "description": "The callback number exactly as the caller said it, whether that's \"912-345-6789\" or \"nine one two three four five six seven eight nine\". Do not clean it up or count the digits."
+    }
+  },
+  "required": ["phone"]
+}
+```
+
+Description: *Check a callback phone number and count its digits. Call this
+every time a caller gives a phone number, before reading it back. Never count
+the digits yourself.*
+
+`take_message`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "message_text": {"type": "string", "description": "What the caller would like passed on, and who it's for"},
+    "caller_name": {"type": "string", "description": "The caller's name as spelled out"},
+    "callback_phone": {"type": "string", "description": "The confirmed callback number"}
+  },
+  "required": ["message_text"]
+}
+```
 
 **`check_phone_number` is not optional.** Counting digits is the one thing a
 voice agent reliably gets wrong: on a live call it counted a correct

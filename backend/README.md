@@ -229,12 +229,16 @@ minutes of silence on a live call if anything goes wrong.
   "properties": {
     "phone": {
       "type": "string",
-      "description": "The callback number exactly as the caller said it, whether that's \"912-345-6789\" or \"nine one two three four five six seven eight nine\". Do not clean it up or count the digits."
+      "description": "The number as the caller said it, in digits or words. Never count or edit it."
     }
   },
   "required": ["phone"]
 }
 ```
+
+Keep each description on one line and free of quotes. A description long
+enough to wrap when pasted becomes a literal newline inside a JSON string,
+which the editor rejects as a bad control character.
 
 Description: *Check a callback phone number and count its digits. Call this
 every time a caller gives a phone number, before reading it back. Never count
@@ -246,8 +250,8 @@ the digits yourself.*
 {
   "type": "object",
   "properties": {
-    "message_text": {"type": "string", "description": "What the caller would like passed on, and who it's for"},
-    "caller_name": {"type": "string", "description": "The caller's name as spelled out"},
+    "message_text": {"type": "string", "description": "What to pass on, and who it is for"},
+    "caller_name": {"type": "string", "description": "The caller name as spelled out"},
     "callback_phone": {"type": "string", "description": "The confirmed callback number"}
   },
   "required": ["message_text"]

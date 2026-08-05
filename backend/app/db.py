@@ -5,12 +5,12 @@ import sqlite3
 import uuid
 from pathlib import Path
 
+from .intake_fields import ALL_FIELDS, BOOL_FIELDS, COLUMNS as _FIELD_COLUMNS
 from .validators import (
     is_valid_email,
     is_valid_phone,
     normalize_category,
     normalize_subcategory,
-    normalize_subtype,
 )
 
 DB_PATH = os.getenv("DB_PATH", "./data/cases.db")
@@ -29,6 +29,11 @@ BUCKETS = [
     "emergency_flags",
 ]
 
+# The intake fields themselves (~60 of them, most category-specific) are
+# generated from app/intake_fields.py rather than written out here, so the
+# schema can't fall behind the fields the agent prompt actually collects.
+_INTAKE_DDL = ",\n".join(f"    {name:<32} {sql_type}" for name, sql_type in _FIELD_COLUMNS)
+
 _TABLE_TEMPLATE = """
 CREATE TABLE IF NOT EXISTS {table} (
     id                    TEXT PRIMARY KEY,
@@ -42,22 +47,9 @@ CREATE TABLE IF NOT EXISTS {table} (
     court_status_updated  TEXT,
     case_category         TEXT,
     case_subcategory      TEXT,
-    case_subtype          TEXT,
-    caller_name           TEXT,
-    callback_phone        TEXT,
     is_phone_valid        INTEGER,
-    email                 TEXT,
     is_email_valid        INTEGER,
-    incident_date         TEXT,
-    location              TEXT,
-    opposing_party        TEXT,
-    key_date_or_deadline  TEXT,
-    represented_already   INTEGER,
-    injured               INTEGER,
-    emergency_flagged     INTEGER,
-    police_report_filed   INTEGER,
-    case_summary          TEXT,
-    additional_details    TEXT,
+""" + _INTAKE_DDL + """,
     call_summary          TEXT,
     call_successful       TEXT,
     user_sentiment        TEXT,
@@ -152,7 +144,10 @@ _conn.commit()
 
 # CREATE TABLE IF NOT EXISTS above only creates brand-new tables — existing
 # deployments already have these tables without newer columns, so add any
-# that are missing by hand.
+# that are missing by hand. The intake fields come from the same spec the
+# schema is built from, which is what carries an existing database across a
+# change to the agent prompt's field list: add a field to intake_fields.py
+# and the column appears on the next start.
 _NEW_COLUMNS = [
     ("is_phone_valid", "INTEGER"),
     ("is_email_valid", "INTEGER"),
@@ -164,8 +159,7 @@ _NEW_COLUMNS = [
     ("manual_edits", "TEXT"),
     ("case_subcategory", "TEXT"),
     ("hearing_attorney", "TEXT"),
-    ("case_subtype", "TEXT"),
-]
+] + _FIELD_COLUMNS
 for _table in BUCKETS:
     _existing = {row["name"] for row in _conn.execute(f"PRAGMA table_info({_table})")}
     for _col, _type in _NEW_COLUMNS:
@@ -187,21 +181,9 @@ _UPDATABLE_COLUMNS = [
     "from_number",
     "case_category",
     "case_subcategory",
-    "caller_name",
-    "callback_phone",
     "is_phone_valid",
-    "email",
     "is_email_valid",
-    "incident_date",
-    "location",
-    "opposing_party",
-    "key_date_or_deadline",
-    "represented_already",
-    "injured",
-    "emergency_flagged",
-    "police_report_filed",
-    "case_summary",
-    "additional_details",
+] + [f.name for f in ALL_FIELDS] + [
     "call_summary",
     "call_successful",
     "user_sentiment",
@@ -412,25 +394,12 @@ def find_by_case_number(case_number: str) -> dict | None:
 # what was actually said, and editing them would destroy the record staff
 # check a correction against.
 EDITABLE_COLUMNS = [
-    "caller_name",
-    "callback_phone",
-    "email",
     "from_number",
     "case_category",
     "case_subcategory",
-    "case_subtype",
-    "incident_date",
-    "location",
-    "opposing_party",
-    "key_date_or_deadline",
-    "case_summary",
-    "additional_details",
-    "represented_already",
-    "injured",
-    "police_report_filed",
-]
+] + [f.name for f in ALL_FIELDS]
 
-_BOOL_COLUMNS = {"represented_already", "injured", "police_report_filed"}
+_BOOL_COLUMNS = set(BOOL_FIELDS)
 
 # Validity flags are derived from a field, so protecting a corrected value
 # has to protect its flag too — otherwise a redelivery recomputes the flag
@@ -469,11 +438,12 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
         updates[col] = None if updates[col] is None else int(bool(updates[col]))
     if "case_category" in updates:
         updates["case_category"] = normalize_category(updates["case_category"])
-    # A subcategory only makes sense under its category, so validate it
+    # A matter type only makes sense under its practice area, so validate it
     # against the category this edit lands on — the new one if the same edit
     # changes it, otherwise the stored one. Recategorizing a case without
-    # touching the subcategory can strand a now-mismatched value (a divorce
-    # subcategory under criminal_defense); clear it in that case.
+    # touching the matter type can strand a now-mismatched value (an
+    # "insider trading" matter type under consumer_class); clear it in that
+    # case.
     effective_category = updates.get("case_category", (current or {}).get("case_category"))
     if "case_subcategory" in updates:
         updates["case_subcategory"] = normalize_subcategory(
@@ -482,19 +452,6 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
     elif "case_category" in updates and (current or {}).get("case_subcategory"):
         if normalize_subcategory(current["case_subcategory"], effective_category) is None:
             updates["case_subcategory"] = None
-    # Subtype (third level) is validated against the category+case_type it
-    # lands on, and cleared when a category/subcategory change strands it.
-    effective_type = updates.get("case_subcategory", (current or {}).get("case_subcategory"))
-    if "case_subtype" in updates:
-        updates["case_subtype"] = normalize_subtype(
-            updates["case_subtype"], effective_category, effective_type
-        )
-    elif (
-        ("case_category" in updates or "case_subcategory" in updates)
-        and (current or {}).get("case_subtype")
-        and normalize_subtype(current["case_subtype"], effective_category, effective_type) is None
-    ):
-        updates["case_subtype"] = None
     if "callback_phone" in updates:
         valid = is_valid_phone(updates["callback_phone"])
         updates["is_phone_valid"] = None if valid is None else int(valid)
@@ -514,28 +471,22 @@ def update_record_fields(table: str, call_id: str, fields: dict) -> dict | None:
     return get_record(table, call_id)
 
 
-def set_classification(
-    table: str, call_id: str, case_subcategory: str | None, case_subtype: str | None
-) -> None:
-    """Write the LLM classifier's case type + subtype onto a record.
+def set_classification(table: str, call_id: str, case_subcategory: str | None) -> None:
+    """Write the LLM classifier's matter type onto a record.
 
-    Skips either field a human has already corrected (`manual_edits`) — the
+    Skips a field a human has already corrected (`manual_edits`) — the
     classifier never overrides a staff decision. Not marked as a manual edit
     itself, so a later human correction still wins and a webhook redelivery
     can still re-run classification. See app/classify.py."""
     _check_bucket(table)
-    protected = _manual_edits(get_record(table, call_id))
-    updates: dict = {}
-    if "case_subcategory" not in protected and case_subcategory is not None:
-        updates["case_subcategory"] = case_subcategory
-    if "case_subtype" not in protected:
-        updates["case_subtype"] = case_subtype
-    if not updates:
+    if case_subcategory is None:
         return
-    clause = ", ".join(f"{k} = :{k}" for k in updates)
+    if "case_subcategory" in _manual_edits(get_record(table, call_id)):
+        return
     _conn.execute(
-        f"UPDATE {table} SET {clause}, updated_at = datetime('now') WHERE call_id = :__c",
-        {**updates, "__c": call_id},
+        f"UPDATE {table} SET case_subcategory = :s, updated_at = datetime('now')"
+        f" WHERE call_id = :__c",
+        {"s": case_subcategory, "__c": call_id},
     )
     _conn.commit()
 

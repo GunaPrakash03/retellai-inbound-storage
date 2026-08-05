@@ -11,7 +11,7 @@ import { CATEGORY_LABELS, categoryToSlug, slugToCategory } from "../constants";
 export default function CasesPage() {
   const { area, callId } = useParams();
   const navigate = useNavigate();
-  const { taxonomy, subtypeLabels, refreshCounts } = useOutletContext();
+  const { taxonomy, refreshCounts } = useOutletContext();
 
   const category = area ? slugToCategory(area) : null;
   const [cases, setCases] = useState([]);
@@ -102,14 +102,12 @@ export default function CasesPage() {
           assignedFilter={assignedFilter}
           onSubcategoryChange={setSubcategoryFilter}
           onAssignedChange={setAssignedFilter}
-          subtypeLabels={subtypeLabels}
         />
         <CaseDetail
           bucket="cases"
           callId={callId || null}
           onChanged={onChanged}
           taxonomy={taxonomy}
-          subtypeLabels={subtypeLabels}
         />
       </div>
     </div>

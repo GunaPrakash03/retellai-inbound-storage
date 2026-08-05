@@ -1,5 +1,15 @@
 # Case Taxonomy & LLM Classification
 
+> **Superseded — describes the previous general-practice configuration.**
+> This document specifies a three-level taxonomy (practice area → case type →
+> subtype) for a nine-area general practice: personal injury, family law,
+> criminal defense, and so on. The intake line now runs the Bottini & Bottini
+> prompt in `backend/agent-prompt-latest.txt`, whose ten practice areas are
+> shareholder, whistleblower, and consumer litigation, with two levels rather
+> than three. The live taxonomy is `backend/app/taxonomy.py` and the fields
+> each area collects are `backend/app/intake_fields.py`. Kept for the
+> classifier design and the reasoning behind it, both of which still apply.
+
 Design for a **three-level** case taxonomy — practice area → case type → subtype
 — and an LLM step that classifies each completed call to its most precise match.
 Workplace & Employment is fully specified below as the first area; the other

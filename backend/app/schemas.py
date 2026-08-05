@@ -1,5 +1,7 @@
 from typing import Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
+
+from .intake_fields import ALL_FIELDS
 
 CASE_STATUSES = Literal["new", "reviewed", "contacted", "closed"]
 
@@ -18,30 +20,24 @@ class CourtStatusUpdate(BaseModel):
     hearing_attorney: str | None = None
 
 
-class RecordFieldsUpdate(BaseModel):
-    """Staff corrections to intake fields the extraction got wrong.
-
-    Every field is optional and only those actually sent are applied
-    (`exclude_unset`), so the dashboard can PATCH one corrected name without
-    blanking everything else on the record.
-    """
-
-    caller_name: str | None = None
-    callback_phone: str | None = None
-    email: str | None = None
-    from_number: str | None = None
-    case_category: str | None = None
-    case_subcategory: str | None = None
-    case_subtype: str | None = None
-    incident_date: str | None = None
-    location: str | None = None
-    opposing_party: str | None = None
-    key_date_or_deadline: str | None = None
-    case_summary: str | None = None
-    additional_details: str | None = None
-    represented_already: bool | None = None
-    injured: bool | None = None
-    police_report_filed: bool | None = None
+# Staff corrections to intake fields the extraction got wrong.
+#
+# Built from the intake field spec rather than written out, so a field added
+# to app/intake_fields.py is correctable in the dashboard without a second
+# edit here — the two lists drifting apart is how a field ends up displayed
+# but not fixable. Every field is optional and only those actually sent are
+# applied (`exclude_unset`), so the dashboard can PATCH one corrected name
+# without blanking everything else on the record.
+RecordFieldsUpdate = create_model(
+    "RecordFieldsUpdate",
+    from_number=(str | None, None),
+    case_category=(str | None, None),
+    case_subcategory=(str | None, None),
+    **{
+        f.name: ((bool | None) if f.kind == "bool" else (str | None), None)
+        for f in ALL_FIELDS
+    },
+)
 
 
 class StaffCreate(BaseModel):

@@ -2,102 +2,24 @@ import re
 from difflib import SequenceMatcher
 
 from .taxonomy import (
-    EMPLOYMENT_CATEGORY,
-    EMPLOYMENT_SUBTYPES,
-    EMPLOYMENT_TYPE_LABELS,
+    CATEGORY_LABELS,
+    MATTER_TYPES,
     slugify as _clean_slug,
 )
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
-VALID_CATEGORIES = {
-    "personal_injury",
-    "workplace_employment",
-    "medical_product",
-    "family_law",
-    "criminal_defense",
-    "immigration",
-    "real_estate_housing",
-    "business_contract",
-    "estate_disability",
-    "other",
-}
+# The ten practice areas in the agent prompt's Step 1. Declared in
+# intake_fields.CATEGORIES, next to the fields each area collects.
+VALID_CATEGORIES = set(CATEGORY_LABELS)
 
 
-# Finer-grained matter types within each category. Keyed by category, and
-# kept in step with the matter types the agent prompt's Step 1 / Step 3
-# already ask about — the extraction can only reliably pick values the
-# agent actually asked the questions to distinguish. "other" has no list:
-# by definition it holds what didn't fit a taxonomy.
+# Matter types within each practice area — the taxonomy's second level, from
+# distinctions the agent prompt itself draws. The extraction can only
+# reliably pick values the agent actually asked the questions to
+# distinguish. "other" has no list: by definition it holds what didn't fit.
 VALID_SUBCATEGORIES = {
-    "personal_injury": {
-        "car_accident",
-        "motorcycle_accident",
-        "truck_accident",
-        "pedestrian_bicycle_accident",
-        "slip_and_fall",
-        "dog_bite",
-        "wrongful_death",
-        "boating_accident",
-    },
-    # Employment's case types come from the full taxonomy (25 of them); its
-    # third level (subtype) lives in VALID_SUBTYPES below. See taxonomy.py.
-    "workplace_employment": set(EMPLOYMENT_TYPE_LABELS),
-    "medical_product": {
-        "medical_malpractice",
-        "defective_product",
-        "dangerous_drug_device",
-    },
-    "family_law": {
-        "divorce",
-        "child_custody_visitation",
-        "child_support",
-        "paternity",
-        "adoption_guardianship",
-        "domestic_violence_protection",
-        "emancipation_name_changes",
-    },
-    "criminal_defense": {
-        "dui_dwi",
-        "misdemeanor",
-        "felony",
-        "traffic_violation",
-        "juvenile",
-    },
-    "immigration": {
-        "visa",
-        "green_card",
-        "deportation_removal",
-        "asylum",
-        "citizenship_naturalization",
-    },
-    "real_estate_housing": {
-        "landlord_tenant",
-        "eviction",
-        "purchase_sale_dispute",
-        "foreclosure",
-    },
-    "business_contract": {
-        "breach_of_contract",
-        "partnership_dispute",
-        "debt_collection",
-    },
-    "estate_disability": {
-        "estate_planning",
-        "probate",
-        "social_security_disability",
-        "veterans_benefits",
-    },
-}
-
-
-# Subtypes, the third taxonomy level, keyed by (category, case_type). Only
-# employment is specified so far; validation is by the (type, subtype) pair,
-# so a subtype slug shared by two types is only accepted under a type that
-# actually lists it. See taxonomy.py and CASE-TAXONOMY.md.
-VALID_SUBTYPES = {
-    (EMPLOYMENT_CATEGORY, case_type): {slug for slug, _ in subs}
-    for case_type, subs in EMPLOYMENT_SUBTYPES.items()
+    category: {slug for slug, _ in types} for category, types in MATTER_TYPES.items()
 }
 
 
@@ -114,27 +36,100 @@ def normalize_category(category: str | None) -> str | None:
 
 
 def normalize_subcategory(subcategory: str | None, category: str | None) -> str | None:
-    """Valid subcategory for the given category, or None. Unlike categories
-    there is no catch-all to fall back to — a subcategory that doesn't match
-    the list is dropped, since a wrong specific label ("divorce" on a
-    custody matter) is worse than none."""
+    """Valid matter type for the given category, or None. Unlike categories
+    there is no catch-all to fall back to — a matter type that doesn't match
+    the list is dropped, since a wrong specific label ("insider trading" on a
+    board-oversight matter) is worse than none."""
     if not subcategory:
         return None
     cleaned = _clean_slug(subcategory)
     return cleaned if cleaned in VALID_SUBCATEGORIES.get(category or "", ()) else None
 
 
-def normalize_subtype(
-    subtype: str | None, category: str | None, case_type: str | None
-) -> str | None:
-    """Valid subtype for the given (category, case_type), or None. Validated
-    against the pair — a subtype only counts under a case type that actually
-    lists it. Dropped rather than stored raw, like subcategory."""
-    if not subtype:
+# What Retell's Boolean extraction (and the LLM behind it) has been seen to
+# send in place of a real boolean. Anything not listed here — including the
+# "unknown" the prompt tells the agent to record for a question the caller
+# couldn't answer — is stored as NULL rather than guessed either way.
+_TRUE_WORDS = {"true", "yes", "y", "1"}
+_FALSE_WORDS = {"false", "no", "n", "0", "none", "never"}
+
+
+def coerce_bool(value) -> int | None:
+    """A three-state boolean: 1, 0, or None for "never captured".
+
+    None matters as much as the other two. The prompt is explicit that a
+    question asked and answered "I don't know" is a different fact from a
+    question never asked, and both are different from a "no" — so a missing
+    field must not collapse to 0 the way `int(bool(value))` collapses it.
+    """
+    if value is None:
         return None
-    cleaned = _clean_slug(subtype)
-    allowed = VALID_SUBTYPES.get((category or "", case_type or ""), ())
-    return cleaned if cleaned in allowed else None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(bool(value))
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    if text in _TRUE_WORDS:
+        return 1
+    if text in _FALSE_WORDS:
+        return 0
+    return None
+
+
+def coerce_text(value) -> str | None:
+    """Trimmed text, or None for an empty field."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+# Phrases a caller's "I haven't reported this anywhere" comes back as. Used
+# only to decide whether a whistleblower matter is first-to-file sensitive;
+# anything unrecognized is treated as "they have reported it somewhere",
+# which is the answer that does *not* raise the flag.
+_NOT_YET_REPORTED = {"no", "none", "no one", "nobody", "not yet", "n/a", "na", "never"}
+
+
+def derive_time_sensitive(flag, category: str | None, fields: dict) -> int | None:
+    """Whether this intake is running against a clock.
+
+    The prompt tells the agent to mark `time_sensitive` itself, but that is
+    one more thing for the extraction to remember on a call that already
+    ended — and the cost of missing it is a lead plaintiff deadline nobody
+    saw. So the extraction's own answer is ORed with the four situations the
+    prompt names as deadline-driven, each read from a field that is already
+    on the record:
+
+      - a securities lead plaintiff deadline the caller read off a notice,
+      - a merger vote, tender, or closing date,
+      - a retaliation adverse action, whose date starts a filing clock,
+      - a whistleblower matter not yet reported anywhere, where being first
+        to file can decide the claim.
+    """
+    captured = coerce_bool(flag)
+    if captured == 1:
+        return 1
+
+    def has(name: str) -> bool:
+        return bool(coerce_text(fields.get(name)))
+
+    derived = False
+    if category == "securities_fraud":
+        derived = has("lead_plaintiff_deadline")
+    elif category == "merger_transaction":
+        derived = has("key_date_or_deadline")
+    elif category == "whistleblower_retaliation":
+        derived = has("incident_date") or has("adverse_action")
+    elif category in ("whistleblower_sec", "whistleblower_qui_tam"):
+        reported = (coerce_text(fields.get("prior_report")) or "").lower().rstrip(".")
+        derived = reported in _NOT_YET_REPORTED or has("key_date_or_deadline")
+
+    if derived:
+        return 1
+    return captured
 
 
 def is_valid_phone(phone: str | None) -> bool | None:
@@ -239,16 +234,25 @@ _OUTCOME_PATTERNS = [
         "call 911",
         "your safety comes first",
         "local emergency number",
+        "go somewhere safe",
     )),
-    # Genuine callers who reached the wrong business (a coding question, a
-    # pricing question). Checked before the "difficult caller" endings below
-    # because these people are polite and coherent — they just need somewhere
-    # other than the attorney review queue.
+    # Genuine callers who reached the wrong place — a technical question, a
+    # sales question, a wrong number, or a real legal matter in an area this
+    # firm doesn't practice. Checked before the "difficult caller" endings
+    # below because these people are polite and coherent; they just need
+    # somewhere other than the attorney review queue.
     ("out_of_scope", (
+        "something our firm can help with",
+        "outside what our firm handles",
+        "we handle shareholder, whistleblower",
+        "we focus on shareholder, whistleblower",
+        "bar association",
+        "not the right place for",
+        # Wording from the previous general-practice prompt, kept so a call
+        # recorded against the old agent still files itself correctly.
         "isn't something our law office",
         "not something our law office",
         "only handle legal matters",
-        "not the right place for",
         "not something we can help with",
         "not the right office",
     )),
@@ -256,11 +260,13 @@ _OUTCOME_PATTERNS = [
         "hard time following",
         "following you clearly",
         "trouble following",
+        "getting accurate information",
     )),
     ("spam", (
         "right time to go through",
         "best time to go through",
         "right time to go over",
+        "ready to share what's going on",
     )),
     ("partial", (
         "gotten disconnected",

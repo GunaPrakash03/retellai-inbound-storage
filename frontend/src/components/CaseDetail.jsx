@@ -17,22 +17,32 @@ import {
 } from "../constants";
 import { daysSince, timeAgo } from "../format";
 
-// `type` drives which input the edit form renders. Order matches the
-// read-only grid so a field doesn't move when you switch into edit mode.
-const FIELD_ROWS = [
-  ["caller_name", "Caller name", "text"],
-  ["callback_phone", "Callback phone", "text"],
-  ["email", "Email", "text"],
-  ["incident_date", "Incident / key date", "text"],
-  ["location", "Location", "text"],
-  ["opposing_party", "Opposing party", "text"],
-  ["key_date_or_deadline", "Deadline / court date", "text"],
-  ["represented_already", "Already represented", "bool"],
-  ["injured", "Injured", "bool"],
-  ["police_report_filed", "Police report filed", "bool"],
-];
+// Which fields to show comes from the record itself: the backend returns an
+// `intake` list of {name, label, kind, must_ask, value} for this record's
+// practice area, generated from the same spec the agent prompt and the
+// database schema come from. Nothing here enumerates field names, so a
+// question added to the prompt shows up without a frontend change.
+//
+// Two are left out of the grid because they have their own UI: the summary
+// is the paragraph at the top of the pane, and additional details is the
+// free-text block near the bottom.
+const OWN_UI = new Set(["case_summary", "additional_details"]);
+
+const intakeRows = (data) => (data?.intake || []).filter((f) => !OWN_UI.has(f.name));
 
 const VALIDITY_KEYS = { callback_phone: "is_phone_valid", email: "is_email_valid" };
+
+// Booleans are three-state — yes, no, or never captured. The prompt treats a
+// question that was never asked as a different fact from a "no", so the edit
+// control has to be able to say so; a checkbox can only say yes or no.
+const BOOL_OPTIONS = [
+  { value: "", label: "Not asked" },
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+];
+
+const boolToDraft = (v) => (v === null || v === undefined || v === "" ? "" : v ? "true" : "false");
+const draftToBool = (v) => (v === "" ? null : v === "true");
 
 // Past this many days, a hearing date is old enough that reading it to a
 // caller without checking could send them to court on the wrong day.
@@ -51,15 +61,14 @@ function parseManualEdits(raw) {
   }
 }
 
-function formatValue(key, value) {
+function formatValue(field) {
+  const { kind, value } = field;
   if (value === null || value === undefined || value === "") return "—";
-  if (["represented_already", "injured", "police_report_filed"].includes(key)) {
-    return value ? "Yes" : "No";
-  }
+  if (kind === "bool") return value ? "Yes" : "No";
   return value;
 }
 
-export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtypeLabels = {} }) {
+export default function CaseDetail({ bucket, callId, onChanged, taxonomy }) {
   const [caseData, setCaseData] = useState(null);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -141,11 +150,11 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
     const seed = {
       case_category: caseData.case_category || "",
       case_subcategory: caseData.case_subcategory || "",
-      case_subtype: caseData.case_subtype || "",
       case_summary: caseData.case_summary || "",
+      additional_details: caseData.additional_details || "",
     };
-    for (const [key, , type] of FIELD_ROWS) {
-      seed[key] = type === "bool" ? !!caseData[key] : caseData[key] ?? "";
+    for (const f of intakeRows(caseData)) {
+      seed[f.name] = f.kind === "bool" ? boolToDraft(f.value) : f.value ?? "";
     }
     setDraft(seed);
     setEditing(true);
@@ -155,12 +164,13 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
     // Diff against what's on screen and send only what actually changed, so
     // merely opening the form doesn't mark every field as hand-corrected —
     // a manually-corrected field stops accepting webhook updates for good.
+    const kinds = Object.fromEntries(intakeRows(caseData).map((f) => [f.name, f.kind]));
     const changed = {};
     for (const [key, value] of Object.entries(draft)) {
-      const original = FIELD_ROWS.find(([k]) => k === key)?.[2] === "bool"
-        ? !!caseData[key]
-        : caseData[key] ?? "";
-      if (value !== original) changed[key] = value === "" ? null : value;
+      const isBool = kinds[key] === "bool";
+      const original = isBool ? boolToDraft(caseData[key]) : caseData[key] ?? "";
+      if (value === original) continue;
+      changed[key] = isBool ? draftToBool(value) : value === "" ? null : value;
     }
     if (Object.keys(changed).length === 0) {
       setEditing(false);
@@ -174,9 +184,19 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
   }
 
   const edited = parseManualEdits(caseData.manual_edits);
-  // Subtype choices for the case type currently drafted, from the taxonomy.
-  const subtypeOptions =
-    (editing && draft && taxonomy?.[draft.case_category]?.subtypes?.[draft.case_subcategory]) || [];
+  const rows = intakeRows(caseData);
+  // Must-ask questions the call never captured — the prompt requires these
+  // before the agent may close, so a non-empty list means someone has to
+  // follow up. An "unknown" the caller actually gave doesn't appear here.
+  const missing = caseData.missing_must_ask || [];
+  const missingLabels = missing
+    .map((name) => rows.find((f) => f.name === name)?.label || name)
+    .join(", ");
+  // Matter types for the drafted category, preferring the backend's list
+  // (fetched once into `taxonomy`) over the bundled fallback in constants.
+  const matterTypes =
+    (editing && draft && (taxonomy?.[draft.case_category]?.types || SUBCATEGORIES[draft.case_category])) ||
+    [];
   const staleDays = daysSince(caseData.court_status_updated);
   const isStale =
     caseData.court_status_updated && staleDays !== null && staleDays >= STALE_AFTER_DAYS;
@@ -206,9 +226,14 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
                 {SUBCATEGORY_LABELS[caseData.case_subcategory] || caseData.case_subcategory}
               </span>
             )}
-            {caseData.case_subtype && (
-              <span className="subcategory-badge subtype-badge">
-                {subtypeLabels[caseData.case_subtype] || caseData.case_subtype}
+            {!!caseData.time_sensitive && (
+              <span className="flag" title="A deadline came up on this call — check the dates before anything else">
+                ⏱ Time sensitive
+              </span>
+            )}
+            {!!caseData.whistleblower_limited_disclosure && (
+              <span className="flag" title="Whistleblower who chose not to give details — do not press for more">
+                Limited disclosure
               </span>
             )}
             {!!caseData.emergency_flagged && (
@@ -322,6 +347,13 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
         </div>
       </div>
 
+      {missing.length > 0 && (
+        <div className="stale-warning">
+          {missing.length} required question{missing.length === 1 ? "" : "s"} never
+          captured: {missingLabels}. Worth confirming on the follow-up call.
+        </div>
+      )}
+
       <div className="section-heading">
         <h3>Intake details</h3>
         {!editing && (
@@ -352,60 +384,40 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
             </select>
           </div>
 
-          {(SUBCATEGORIES[draft.case_category] || []).length > 0 && (
+          {matterTypes.length > 0 && (
             <div className="field-row">
               <span className="field-label">Matter type</span>
               <select
                 value={draft.case_subcategory}
                 disabled={saving}
-                // Changing the case type clears a now-mismatched subtype (the
-                // backend does the same on save).
-                onChange={(e) =>
-                  setDraft({ ...draft, case_subcategory: e.target.value, case_subtype: "" })
-                }
+                onChange={(e) => setDraft({ ...draft, case_subcategory: e.target.value })}
               >
                 <option value="">Not specified</option>
-                {SUBCATEGORIES[draft.case_category].map((s) => (
+                {matterTypes.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </div>
           )}
 
-          {subtypeOptions.length > 0 && (
-            <div className="field-row">
-              <span className="field-label">Detailed type</span>
-              <select
-                value={draft.case_subtype}
-                disabled={saving}
-                onChange={(e) => setDraft({ ...draft, case_subtype: e.target.value })}
-              >
-                <option value="">Not specified</option>
-                {subtypeOptions.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {FIELD_ROWS.map(([key, label, type]) => (
-            <div className="field-row" key={key}>
-              <span className="field-label">{label}</span>
-              {type === "bool" ? (
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft[key]}
-                    disabled={saving}
-                    onChange={(e) => setDraft({ ...draft, [key]: e.target.checked })}
-                  />
-                  {draft[key] ? "Yes" : "No"}
-                </label>
+          {rows.map((f) => (
+            <div className="field-row" key={f.name}>
+              <span className="field-label">{f.label}</span>
+              {f.kind === "bool" ? (
+                <select
+                  value={draft[f.name]}
+                  disabled={saving}
+                  onChange={(e) => setDraft({ ...draft, [f.name]: e.target.value })}
+                >
+                  {BOOL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               ) : (
                 <input
-                  value={draft[key]}
+                  value={draft[f.name]}
                   disabled={saving}
-                  onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                  onChange={(e) => setDraft({ ...draft, [f.name]: e.target.value })}
                 />
               )}
             </div>
@@ -435,23 +447,29 @@ export default function CaseDetail({ bucket, callId, onChanged, taxonomy, subtyp
         </div>
       ) : (
         <div className="field-grid">
-          {FIELD_ROWS.map(([key, label]) => {
-            const validityKey = VALIDITY_KEYS[key];
-            const isInvalid = validityKey && caseData[key] && caseData[validityKey] === 0;
+          {rows.map((f) => {
+            const validityKey = VALIDITY_KEYS[f.name];
+            const isInvalid = validityKey && f.value && caseData[validityKey] === 0;
+            const notAsked = f.must_ask && missing.includes(f.name);
             return (
-              <div className="field-row" key={key}>
-                <span className="field-label">{label}</span>
+              <div className="field-row" key={f.name}>
+                <span className="field-label">{f.label}</span>
                 <span className="field-value">
-                  {formatValue(key, caseData[key])}
-                  {edited.has(key) && (
+                  {formatValue(f)}
+                  {edited.has(f.name) && (
                     <span className="corrected" title="Corrected by staff; protected from webhook updates">
                       edited
+                    </span>
+                  )}
+                  {notAsked && (
+                    <span className="flag" title="The prompt requires this question, and the call never captured an answer">
+                      not asked
                     </span>
                   )}
                   {isInvalid && (
                     <span
                       className="flag"
-                      title={`This ${label.toLowerCase()} doesn't look valid — may need a callback to confirm`}
+                      title={`This ${f.label.toLowerCase()} doesn't look valid — may need a callback to confirm`}
                     >
                       ⚠ invalid
                     </span>

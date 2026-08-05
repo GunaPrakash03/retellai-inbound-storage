@@ -26,14 +26,6 @@ export default function Layout() {
     return () => clearInterval(interval);
   }, [refreshCounts]);
 
-  // Flat subtype slug -> label, derived from the fetched taxonomy, for display.
-  const subtypeLabels = {};
-  for (const area of Object.values(taxonomy || {})) {
-    for (const subs of Object.values(area.subtypes || {})) {
-      for (const s of subs) subtypeLabels[s.value] = s.label;
-    }
-  }
-
   return (
     <div className="app">
       <header className="app-header">
@@ -48,7 +40,7 @@ export default function Layout() {
       <div className="app-body">
         <Sidebar counts={counts} />
         <main className="workspace">
-          <Outlet context={{ counts, taxonomy, subtypeLabels, refreshCounts }} />
+          <Outlet context={{ counts, taxonomy, refreshCounts }} />
         </main>
       </div>
     </div>

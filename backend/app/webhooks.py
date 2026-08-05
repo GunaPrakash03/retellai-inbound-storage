@@ -7,8 +7,12 @@ from fastapi import APIRouter, BackgroundTasks, Request, Response
 
 from .classify import classify_and_store
 from .db import find_caller_history, find_staff_phone, staff_directory_line, upsert_record
+from .intake_fields import ALL_FIELDS, REQUIRED_FOR_CASE
 from .security import verify_signature
 from .validators import (
+    coerce_bool,
+    coerce_text,
+    derive_time_sensitive,
     detect_outcome_from_transcript,
     is_valid_email,
     is_valid_phone,
@@ -102,11 +106,31 @@ async def post_call(request: Request, background: BackgroundTasks):
         analysis = call.get("call_analysis", {}) or {}
         d = analysis.get("custom_analysis_data", {}) or {}
 
-        emergency_flagged = int(bool(d.get("emergency_flagged")))
         case_category = normalize_category(d.get("case_category"))
         case_subcategory = normalize_subcategory(d.get("case_subcategory"), case_category)
-        required = (d.get("caller_name"), d.get("callback_phone"), case_category, d.get("case_summary"))
-        is_complete = all(required)
+
+        # Every intake field the agent prompt collects, coerced by its
+        # declared type. Booleans are three-state: a field the call never
+        # captured stays NULL rather than becoming a "no". See
+        # app/intake_fields.py for the spec these come from.
+        fields = {
+            f.name: (coerce_bool(d.get(f.name)) if f.kind == "bool" else coerce_text(d.get(f.name)))
+            for f in ALL_FIELDS
+        }
+        fields["time_sensitive"] = derive_time_sensitive(
+            d.get("time_sensitive"), case_category, fields
+        )
+        # The one boolean kept two-state: it decides which bucket the call
+        # lands in, and "we couldn't tell" has to mean "no safety event".
+        emergency_flagged = 1 if fields.get("emergency_flagged") == 1 else 0
+        fields["emergency_flagged"] = emergency_flagged
+
+        # Enough to be a case an attorney can act on: who called, how to
+        # reach them, what kind of matter, and what happened. The rest of the
+        # prompt's must-ask list is reported per record rather than gating
+        # the bucket — see intake_fields.missing_must_ask.
+        captured = {**fields, "case_category": case_category}
+        is_complete = all(captured.get(name) for name in REQUIRED_FOR_CASE)
 
         # Primary signal: search the transcript for the agent's own scripted
         # closing lines, which we control exactly — deterministic, unlike
@@ -118,7 +142,15 @@ async def post_call(request: Request, background: BackgroundTasks):
         transcript_outcome = detect_outcome_from_transcript(call.get("transcript"))
         outcome = d.get("call_outcome")
 
-        if emergency_flagged or transcript_outcome == "emergency":
+        # A safety event only takes the call out of the attorney queue when it
+        # actually ended the call, or when the intake never finished. The
+        # prompt has one branch — a whistleblower who says they are being
+        # threatened — where the agent checks on the caller's safety and then
+        # carries on with the whole intake once they confirm they're safe.
+        # Filing that finished intake under emergency_flags alone would hide a
+        # complete case from the attorneys who need it, so it goes to `cases`
+        # with emergency_flagged set and shows as flagged there.
+        if transcript_outcome == "emergency" or (emergency_flagged and not is_complete):
             table = "emergency_flags"
         elif transcript_outcome == "out_of_scope":
             table = "out_of_scope_calls"
@@ -131,8 +163,8 @@ async def post_call(request: Request, background: BackgroundTasks):
         else:
             table = "partial_calls"
 
-        phone_valid = is_valid_phone(d.get("callback_phone"))
-        email_valid = is_valid_email(d.get("email"))
+        phone_valid = is_valid_phone(fields.get("callback_phone"))
+        email_valid = is_valid_email(fields.get("email"))
 
         row = {
             "id": str(uuid.uuid4()),
@@ -140,21 +172,9 @@ async def post_call(request: Request, background: BackgroundTasks):
             "from_number": call.get("from_number"),
             "case_category": case_category,
             "case_subcategory": case_subcategory,
-            "caller_name": d.get("caller_name"),
-            "callback_phone": d.get("callback_phone"),
             "is_phone_valid": None if phone_valid is None else int(phone_valid),
-            "email": d.get("email"),
             "is_email_valid": None if email_valid is None else int(email_valid),
-            "incident_date": d.get("incident_date"),
-            "location": d.get("location"),
-            "opposing_party": d.get("opposing_party"),
-            "key_date_or_deadline": d.get("key_date_or_deadline"),
-            "represented_already": int(bool(d.get("represented_already"))),
-            "injured": int(bool(d.get("injured"))),
-            "emergency_flagged": emergency_flagged,
-            "police_report_filed": int(bool(d.get("police_report_filed"))),
-            "case_summary": d.get("case_summary"),
-            "additional_details": d.get("additional_details"),
+            **fields,
             "call_summary": analysis.get("call_summary"),
             "call_successful": str(analysis.get("call_successful", "")),
             "user_sentiment": analysis.get("user_sentiment"),
@@ -164,11 +184,10 @@ async def post_call(request: Request, background: BackgroundTasks):
 
         upsert_record(table, row)
 
-        # Completed intakes get an LLM pass that fills the matter type from the
-        # transcript (and, for employment, the finer subtype). Runs in the
-        # background so it never delays this webhook's response; it's a no-op
-        # for "other", for already-classified cases, and when no
-        # GEMINI_API_KEY is set. See app/classify.py.
+        # Completed intakes get an LLM pass that fills the matter type from
+        # the transcript. Runs in the background so it never delays this
+        # webhook's response; it's a no-op for "other", for already-classified
+        # cases, and when no GEMINI_API_KEY is set. See app/classify.py.
         if table == "cases":
             background.add_task(classify_and_store, "cases", call.get("call_id"))
 

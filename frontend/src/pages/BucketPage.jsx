@@ -11,7 +11,7 @@ import { BUCKETS } from "../constants";
 export default function BucketPage() {
   const { bucket, callId } = useParams();
   const navigate = useNavigate();
-  const { taxonomy, subtypeLabels, refreshCounts } = useOutletContext();
+  const { taxonomy, refreshCounts } = useOutletContext();
 
   const active = BUCKETS.find((b) => b.key === bucket);
   const [records, setRecords] = useState([]);
@@ -87,14 +87,12 @@ export default function BucketPage() {
           assignedFilter=""
           onSubcategoryChange={() => {}}
           onAssignedChange={() => {}}
-          subtypeLabels={subtypeLabels}
         />
         <CaseDetail
           bucket={bucket}
           callId={callId || null}
           onChanged={onChanged}
           taxonomy={taxonomy}
-          subtypeLabels={subtypeLabels}
         />
       </div>
     </div>

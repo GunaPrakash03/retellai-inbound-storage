@@ -10,7 +10,7 @@ import json
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
+from . import db, intake_fields
 from .db import get_case, get_record, list_cases, list_records, update_record_status, update_status
 from .schemas import (
     AssignmentUpdate,
@@ -74,19 +74,43 @@ def get_category_counts():
 
 @app.get("/taxonomy")
 def get_taxonomy():
-    """The finer taxonomy (case types + subtypes) the dashboard renders, so
-    the ~260 labels live in one place (backend taxonomy.py) rather than being
-    duplicated in the frontend. Only employment is populated so far."""
+    """Practice areas and their matter types, so the labels live in one place
+    (backend taxonomy.py) rather than being duplicated in the frontend."""
     from . import taxonomy
 
     return {
-        taxonomy.EMPLOYMENT_CATEGORY: {
-            "types": [{"value": v, "label": l} for v, l in taxonomy.EMPLOYMENT_TYPES],
-            "subtypes": {
-                type_slug: [{"value": s, "label": lbl} for s, lbl in subs]
-                for type_slug, subs in taxonomy.EMPLOYMENT_SUBTYPES.items()
-            },
+        category: {
+            "label": taxonomy.CATEGORY_LABELS[category],
+            "types": [{"value": v, "label": l} for v, l in taxonomy.subcategory_choices(category)],
         }
+        for category, _ in taxonomy.CATEGORIES
+    }
+
+
+@app.get("/intake-fields")
+def get_intake_fields():
+    """What the agent collects, per practice area — the same spec the schema,
+    the webhook, and the Retell extraction config are all generated from.
+
+    The dashboard renders a record's fields from this, so a field added to
+    app/intake_fields.py shows up without a frontend change, and `must_ask`
+    marks the ones the prompt requires before the agent may close the call.
+    """
+    return {
+        "core": [
+            {"name": f.name, "label": f.label, "kind": f.kind, "must_ask": f.must_ask}
+            for f in intake_fields.CORE_FIELDS
+        ],
+        "categories": {
+            category: {
+                "label": label,
+                "fields": [
+                    {"name": f.name, "label": f.label, "kind": f.kind, "must_ask": f.must_ask}
+                    for f in intake_fields.CATEGORY_FIELDS.get(category, [])
+                ],
+            }
+            for category, label in intake_fields.CATEGORIES
+        },
     }
 
 
@@ -141,8 +165,8 @@ def debug_classify(call_id: str, store: bool = False):
         "case_category": category,
         "has_transcript": bool(row.get("transcript")),
     }
-    if store and (v := result["validated"])["case_subcategory"]:
-        db.set_classification("cases", call_id, v["case_subcategory"], v["case_subtype"])
+    if store and (matter_type := result["validated"]["case_subcategory"]):
+        db.set_classification("cases", call_id, matter_type)
         result["stored"] = True
     return result
 
@@ -158,12 +182,27 @@ def debug_purge():
     return {"purged": True, "cleared": cleared}
 
 
+def _with_intake(row: dict) -> dict:
+    """A record plus what the prompt says should be on it.
+
+    `intake` is the labelled field list for this record's practice area, and
+    `missing_must_ask` names the must-ask questions that never got captured —
+    the prompt's own Step 4 check, applied after the call. Both are derived,
+    never stored, so they can't fall behind the spec.
+    """
+    return {
+        **row,
+        "intake": intake_fields.field_view(row),
+        "missing_must_ask": intake_fields.missing_must_ask(row),
+    }
+
+
 @app.get("/cases/{call_id}")
 def get_case_detail(call_id: str):
     row = get_case(call_id)
     if not row:
         raise HTTPException(status_code=404, detail="Case not found")
-    return row
+    return _with_intake(row)
 
 
 @app.patch("/cases/{call_id}")
@@ -172,7 +211,7 @@ def patch_case_status(call_id: str, body: StatusUpdate):
     if not row:
         raise HTTPException(status_code=404, detail="Case not found")
     update_status(call_id, body.status)
-    return get_case(call_id)
+    return _with_intake(get_case(call_id))
 
 
 # ------------------------------------------------------------- staff ------
@@ -460,7 +499,7 @@ def get_bucket_record_detail(bucket: str, call_id: str):
     row = get_record(_bucket_table(bucket), call_id)
     if not row:
         raise HTTPException(status_code=404, detail="Record not found")
-    return row
+    return _with_intake(row)
 
 
 @app.patch("/{bucket}/{call_id}")
@@ -470,7 +509,7 @@ def patch_bucket_record_status(bucket: str, call_id: str, body: StatusUpdate):
     if not row:
         raise HTTPException(status_code=404, detail="Record not found")
     update_record_status(table, call_id, body.status)
-    return get_record(table, call_id)
+    return _with_intake(get_record(table, call_id))
 
 
 def _any_bucket_table(bucket: str) -> str:
@@ -494,7 +533,7 @@ def patch_record_fields(bucket: str, call_id: str, body: RecordFieldsUpdate):
     table = _any_bucket_table(bucket)
     if not get_record(table, call_id):
         raise HTTPException(status_code=404, detail="Record not found")
-    return db.update_record_fields(table, call_id, body.model_dump(exclude_unset=True))
+    return _with_intake(db.update_record_fields(table, call_id, body.model_dump(exclude_unset=True)))
 
 
 @app.patch("/{bucket}/{call_id}/assignment")
@@ -503,7 +542,7 @@ def patch_assignment(bucket: str, call_id: str, body: AssignmentUpdate):
     if not get_record(table, call_id):
         raise HTTPException(status_code=404, detail="Record not found")
     db.set_case_assignment(table, call_id, body.assigned_to)
-    return get_record(table, call_id)
+    return _with_intake(get_record(table, call_id))
 
 
 @app.patch("/{bucket}/{call_id}/court-status")
@@ -514,4 +553,4 @@ def patch_court_status(bucket: str, call_id: str, body: CourtStatusUpdate):
     db.set_court_status(
         table, call_id, body.court_status, body.next_hearing_date, body.hearing_attorney
     )
-    return get_record(table, call_id)
+    return _with_intake(get_record(table, call_id))

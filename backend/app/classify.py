@@ -1,8 +1,7 @@
 """Post-call LLM classification into the case taxonomy, using Gemini.
 
 Fills the matter type (case_subcategory) from the call transcript for every
-practice area that has one, and — for Workplace & Employment — the finer
-subtype (case_subtype) too. Runs after the webhook has stored the record, as
+practice area that has one. Runs after the webhook has stored the record, as
 a background step, so it never affects the live call or the webhook response.
 
 Deliberately defensive: no API key, a network error, a bad response, or an
@@ -22,12 +21,7 @@ import urllib.request
 from . import db
 from . import taxonomy
 from .taxonomy import slugify
-from .validators import (
-    EMPLOYMENT_CATEGORY,
-    VALID_SUBCATEGORIES,
-    normalize_subcategory,
-    normalize_subtype,
-)
+from .validators import VALID_SUBCATEGORIES
 
 _ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _DEFAULT_MODEL = "gemini-2.5-flash"
@@ -140,68 +134,7 @@ def _confidence(answer: dict) -> float:
         return 0.0
 
 
-# ----------------------------------------- employment (type + subtype) -----
-
-def _employment_taxonomy_text() -> str:
-    lines = []
-    for type_slug, type_label in taxonomy.EMPLOYMENT_TYPES:
-        subs = ", ".join(label for _, label in taxonomy.EMPLOYMENT_SUBTYPES[type_slug])
-        lines.append(f"- {type_label}: {subs}")
-    return "\n".join(lines)
-
-
-def _employment_schema() -> dict:
-    type_labels = list(taxonomy.EMPLOYMENT_TYPE_LABELS.values())
-    subtype_labels = sorted(set(taxonomy.SUBTYPE_LABELS.values()))
-    return {
-        "type": "OBJECT",
-        "properties": {
-            "case_type": {"type": "STRING", "enum": type_labels + [_NONE]},
-            "case_subtype": {"type": "STRING", "enum": subtype_labels + [_NONE]},
-            "confidence": {"type": "NUMBER"},
-        },
-        "required": ["case_type", "case_subtype", "confidence"],
-    }
-
-
-def _employment_prompt(transcript: str, case_summary: str | None) -> str:
-    return (
-        "You classify a US legal intake call into a fixed Workplace & "
-        "Employment taxonomy. Choose the single best case type, and the single "
-        "best subtype that belongs to that case type. If nothing fits well, "
-        f'answer "{_NONE}" for that field. Never invent a value not listed. '
-        "Return JSON with keys case_type, case_subtype, confidence (0..1).\n\n"
-        f"Taxonomy (case type: its subtypes):\n{_employment_taxonomy_text()}\n\n"
-        f"Case summary: {case_summary or '(none)'}\n\n"
-        f"Transcript:\n{transcript}"
-    )
-
-
-def _validate_employment(answer: dict | None) -> tuple[str | None, str | None]:
-    if not answer or _confidence(answer) < _MIN_CONFIDENCE:
-        return (None, None)
-    raw_type = answer.get("case_type")
-    raw_subtype = answer.get("case_subtype")
-    case_type = normalize_subcategory(
-        None if raw_type in (None, _NONE) else str(raw_type), EMPLOYMENT_CATEGORY
-    )
-    case_subtype = normalize_subtype(
-        None if raw_subtype in (None, _NONE) else str(raw_subtype),
-        EMPLOYMENT_CATEGORY,
-        case_type,
-    )
-    return (case_type, case_subtype)
-
-
-def classify_employment(
-    transcript: str | None, case_summary: str | None
-) -> tuple[str | None, str | None]:
-    if not transcript:
-        return (None, None)
-    return _validate_employment(_gemini(_employment_prompt(transcript, case_summary), _employment_schema()))
-
-
-# ---------------------------- matter type, any non-employment area ---------
+# -------------------------------- matter type, any practice area ----------
 
 def _subcategory_schema(slugs: list[str]) -> dict:
     return {
@@ -218,9 +151,11 @@ def _subcategory_prompt(
     category: str, choices: list[tuple[str, str]], transcript: str, case_summary: str | None
 ) -> str:
     options = "\n".join(f"- {slug}  ({label})" for slug, label in choices)
+    area = taxonomy.CATEGORY_LABELS.get(category, category.replace("_", " "))
     return (
-        f"You classify a US legal intake call in the {category.replace('_', ' ')} "
-        "practice area into its matter type. Choose the single best matter_type "
+        f"You classify a US shareholder, whistleblower, or consumer litigation "
+        f"intake call in the {area} practice area into its matter type. "
+        "Choose the single best matter_type "
         f'value from the list. If nothing fits well, answer "{_NONE}". Never '
         "invent a value not listed. Return JSON with keys matter_type, "
         "confidence (0..1). Answer with the value on the left (the slug).\n\n"
@@ -269,26 +204,18 @@ def classify_and_store(table: str, call_id: str) -> None:
     if not record:
         return
     category = record.get("case_category")
-    edited = db._manual_edits(record)
-    if "case_subcategory" in edited or "case_subtype" in edited:
+    if "case_subcategory" in db._manual_edits(record):
         return
+    if record.get("case_subcategory"):
+        return  # already has a matter type (from Retell or a prior run)
+    if not taxonomy.subcategory_choices(category):
+        return  # "other", or an area with no matter types
 
-    if category == EMPLOYMENT_CATEGORY:
-        if record.get("case_subtype"):
-            return
-        case_type, case_subtype = classify_employment(
-            record.get("transcript"), record.get("case_summary")
-        )
-        if case_type or case_subtype:
-            db.set_classification(table, call_id, case_type, case_subtype)
-    elif taxonomy.subcategory_choices(category):
-        if record.get("case_subcategory"):
-            return  # already has a matter type (from Retell or a prior run)
-        subcategory = classify_subcategory(
-            category, record.get("transcript"), record.get("case_summary")
-        )
-        if subcategory:
-            db.set_classification(table, call_id, subcategory, None)
+    subcategory = classify_subcategory(
+        category, record.get("transcript"), record.get("case_summary")
+    )
+    if subcategory:
+        db.set_classification(table, call_id, subcategory)
 
 
 def diagnose(category: str | None, transcript: str | None, case_summary: str | None) -> dict:
@@ -299,24 +226,20 @@ def diagnose(category: str | None, transcript: str | None, case_summary: str | N
     key_set = bool(os.getenv("GEMINI_API_KEY", "").strip())
     model = os.getenv("GEMINI_MODEL", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL
     raw: dict | None = None
-    subcategory = subtype = None
+    subcategory = None
 
-    if key_set and transcript:
-        if category == EMPLOYMENT_CATEGORY:
-            raw = _gemini(_employment_prompt(transcript, case_summary), _employment_schema())
-            subcategory, subtype = _validate_employment(raw)
-        elif taxonomy.subcategory_choices(category or ""):
-            choices = taxonomy.subcategory_choices(category or "")
-            raw = _gemini(
-                _subcategory_prompt(category, choices, transcript, case_summary),
-                _subcategory_schema([s for s, _ in choices]),
-            )
-            subcategory = _validate_subcategory(raw, category or "")
+    choices = taxonomy.subcategory_choices(category or "")
+    if key_set and transcript and choices:
+        raw = _gemini(
+            _subcategory_prompt(category or "", choices, transcript, case_summary),
+            _subcategory_schema([s for s, _ in choices]),
+        )
+        subcategory = _validate_subcategory(raw, category or "")
 
     return {
         "gemini_key_set": key_set,
         "model": model,
         "raw_answer": raw,
         "last_error": None if raw is not None else _LAST_ERROR,
-        "validated": {"case_subcategory": subcategory, "case_subtype": subtype},
+        "validated": {"case_subcategory": subcategory},
     }

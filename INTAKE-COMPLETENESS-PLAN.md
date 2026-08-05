@@ -1,9 +1,17 @@
 # Intake Completeness — Audit and Fix Plan
 
+> **Largely implemented, against a different practice.** The audit below was
+> written for the previous general-practice prompt, and its central
+> recommendation — a per-category required-fields spec as one source of truth
+> — now exists as `backend/app/intake_fields.py`, built for the Bottini &
+> Bottini prompt's ten areas. Category-specific answers have real columns
+> instead of competing for `additional_details`, must-ask coverage is
+> reported per record as `missing_must_ask`, and the extraction config is
+> generated from the same spec. The specific field gaps listed below refer to
+> practice areas the firm no longer takes.
+
 Goal: every case, in every practice area, arrives with enough accurate detail
 that an attorney can act on it without calling the client back for basics.
-
-This document is the plan. Nothing here is implemented yet.
 
 ## 1. What's actually wrong
 

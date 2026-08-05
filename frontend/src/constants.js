@@ -1,110 +1,96 @@
 // Shown in the header masthead. Change this to the firm's name — it's the
 // one place the brand name lives, so nothing else needs touching.
-export const FIRM_NAME = "Law Office of [Your Firm]";
+export const FIRM_NAME = "Bottini & Bottini, Inc.";
 
+// The ten practice areas, in the same order as the agent prompt's Step 1.
+// Must stay in step with intake_fields.CATEGORIES in the backend — the
+// backend normalizes anything it doesn't recognize to "other".
 export const CATEGORIES = [
-  { value: "personal_injury", label: "Personal Injury" },
-  { value: "workplace_employment", label: "Workplace & Employment" },
-  { value: "medical_product", label: "Medical & Product" },
-  { value: "family_law", label: "Family Law" },
-  { value: "criminal_defense", label: "Criminal Defense" },
-  { value: "immigration", label: "Immigration" },
-  { value: "real_estate_housing", label: "Real Estate & Housing" },
-  { value: "business_contract", label: "Business & Contract" },
-  { value: "estate_disability", label: "Estate & Disability" },
+  { value: "securities_fraud", label: "Securities Fraud" },
+  { value: "shareholder_derivative", label: "Shareholder Derivative" },
+  { value: "merger_transaction", label: "Merger / Transaction" },
+  { value: "whistleblower_sec", label: "Whistleblower — SEC / CFTC" },
+  { value: "whistleblower_qui_tam", label: "Whistleblower — Qui Tam" },
+  { value: "whistleblower_retaliation", label: "Whistleblower Retaliation" },
+  { value: "consumer_class", label: "Consumer Class" },
+  { value: "data_privacy_class", label: "Data Privacy Class" },
+  { value: "employment_class", label: "Employment Class" },
   { value: "other", label: "Other" },
 ];
 
 export const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
 
-// Finer-grained matter type within a category. Keyed by category value, so
-// the subcategory dropdown can offer only the choices that belong to the
-// case's category. Must stay in step with VALID_SUBCATEGORIES in the
-// backend's validators.py — the backend rejects any value not on its list.
+// Matter type within a practice area, so the dropdown offers only the choices
+// that belong to the case's category. Fetched from GET /taxonomy at load
+// (see Layout) — this list is the fallback used before that arrives, and
+// must stay in step with MATTER_TYPES in the backend's taxonomy.py.
 export const SUBCATEGORIES = {
-  personal_injury: [
-    { value: "car_accident", label: "Car Accident" },
-    { value: "motorcycle_accident", label: "Motorcycle Accident" },
-    { value: "truck_accident", label: "Truck Accident" },
-    { value: "pedestrian_bicycle_accident", label: "Pedestrian / Bicycle Accident" },
-    { value: "slip_and_fall", label: "Slip and Fall" },
-    { value: "dog_bite", label: "Dog Bite" },
-    { value: "wrongful_death", label: "Wrongful Death" },
-    { value: "boating_accident", label: "Boating Accident" },
+  securities_fraud: [
+    { value: "false_misleading_statements", label: "False or Misleading Statements" },
+    { value: "financial_restatement", label: "Financial Restatement" },
+    { value: "stock_drop_after_disclosure", label: "Stock Drop After Disclosure" },
+    { value: "sec_investigation", label: "SEC Investigation" },
+    { value: "short_seller_report", label: "Short Seller Report" },
+    { value: "bankruptcy", label: "Bankruptcy" },
+    { value: "offering_ipo_disclosures", label: "Offering or IPO Disclosures" },
   ],
-  // The 25 employment case types (full taxonomy). Their subtypes (third level)
-  // are fetched from GET /taxonomy rather than duplicated here — see api.getTaxonomy.
-  workplace_employment: [
-    { value: "hiring_recruitment", label: "Hiring & Recruitment" },
-    { value: "wrongful_termination", label: "Wrongful Termination" },
-    { value: "employment_discrimination", label: "Employment Discrimination" },
-    { value: "workplace_harassment", label: "Workplace Harassment" },
-    { value: "retaliation", label: "Retaliation" },
-    { value: "wage_hour", label: "Wage & Hour" },
-    { value: "employee_benefits_erisa", label: "Employee Benefits (ERISA)" },
-    { value: "leave_rights", label: "Leave Rights" },
-    { value: "disability_accommodation", label: "Disability & Accommodation" },
-    { value: "workplace_safety", label: "Workplace Safety" },
-    { value: "workers_compensation", label: "Workers' Compensation" },
-    { value: "whistleblower", label: "Whistleblower" },
-    { value: "employment_contracts", label: "Employment Contracts" },
-    { value: "restrictive_covenants", label: "Restrictive Covenants" },
-    { value: "labor_union", label: "Labor Union" },
-    { value: "privacy_technology", label: "Privacy & Technology" },
-    { value: "immigration_employment", label: "Immigration Employment" },
-    { value: "equal_pay", label: "Equal Pay" },
-    { value: "workplace_torts", label: "Workplace Torts" },
-    { value: "layoffs_reductions", label: "Layoffs & Reductions" },
-    { value: "executive_employment", label: "Executive Employment" },
-    { value: "gig_economy_independent_contractors", label: "Gig Economy & Independent Contractors" },
-    { value: "public_sector_employment", label: "Public Sector Employment" },
-    { value: "industry_specific_employment", label: "Industry-Specific Employment" },
-    { value: "miscellaneous_employment_claims", label: "Miscellaneous Employment Claims" },
+  shareholder_derivative: [
+    { value: "breach_fiduciary_duty", label: "Breach of Fiduciary Duty" },
+    { value: "corporate_waste", label: "Corporate Waste" },
+    { value: "self_dealing", label: "Self Dealing" },
+    { value: "insider_trading", label: "Insider Trading" },
+    { value: "excessive_executive_compensation", label: "Excessive Executive Compensation" },
+    { value: "board_oversight_failure", label: "Board Oversight Failure" },
   ],
-  medical_product: [
-    { value: "medical_malpractice", label: "Medical Malpractice" },
+  merger_transaction: [
+    { value: "merger", label: "Merger" },
+    { value: "buyout", label: "Buyout" },
+    { value: "take_private", label: "Take Private" },
+    { value: "spac", label: "SPAC" },
+    { value: "tender_offer", label: "Tender Offer" },
+    { value: "appraisal_rights", label: "Appraisal Rights" },
+  ],
+  whistleblower_sec: [
+    { value: "securities_fraud", label: "Securities Fraud" },
+    { value: "accounting_fraud", label: "Accounting Fraud" },
+    { value: "fcpa_violations", label: "FCPA Violations" },
+    { value: "market_manipulation", label: "Market Manipulation" },
+  ],
+  whistleblower_qui_tam: [
+    { value: "medicare_medicaid_fraud", label: "Medicare or Medicaid Fraud" },
+    { value: "defense_contracting_fraud", label: "Defense Contracting Fraud" },
+    { value: "grant_fraud", label: "Grant Fraud" },
+    { value: "customs_fraud", label: "Customs Fraud" },
+  ],
+  whistleblower_retaliation: [
+    { value: "termination", label: "Termination" },
+    { value: "demotion", label: "Demotion" },
+    { value: "suspension", label: "Suspension" },
+    { value: "blacklisting", label: "Blacklisting" },
+    { value: "other_adverse_action", label: "Other Adverse Action" },
+  ],
+  consumer_class: [
+    { value: "false_advertising", label: "False Advertising" },
+    { value: "mislabeled_product", label: "Mislabeled Product" },
+    { value: "hidden_junk_fees", label: "Hidden or Junk Fees" },
+    { value: "auto_renewal_subscription", label: "Auto Renewal or Subscription" },
     { value: "defective_product", label: "Defective Product" },
-    { value: "dangerous_drug_device", label: "Dangerous Drug / Device" },
+    { value: "price_fixing", label: "Price Fixing" },
   ],
-  family_law: [
-    { value: "divorce", label: "Divorce" },
-    { value: "child_custody_visitation", label: "Child Custody and Visitation" },
-    { value: "child_support", label: "Child Support" },
-    { value: "paternity", label: "Paternity" },
-    { value: "adoption_guardianship", label: "Adoption and Guardianship" },
-    { value: "domestic_violence_protection", label: "Domestic Violence Protection" },
-    { value: "emancipation_name_changes", label: "Emancipation and Name Changes" },
+  data_privacy_class: [
+    { value: "data_breach", label: "Data Breach" },
+    { value: "unauthorized_sharing_sale", label: "Unauthorized Sharing or Sale" },
+    { value: "biometric_privacy", label: "Biometric Privacy" },
+    { value: "session_recording_tracking_pixels", label: "Session Recording or Tracking Pixels" },
+    { value: "call_text_practices", label: "Call or Text Practices" },
   ],
-  criminal_defense: [
-    { value: "dui_dwi", label: "DUI / DWI" },
-    { value: "misdemeanor", label: "Misdemeanor" },
-    { value: "felony", label: "Felony" },
-    { value: "traffic_violation", label: "Traffic Violation" },
-    { value: "juvenile", label: "Juvenile" },
-  ],
-  immigration: [
-    { value: "visa", label: "Visa" },
-    { value: "green_card", label: "Green Card" },
-    { value: "deportation_removal", label: "Deportation / Removal" },
-    { value: "asylum", label: "Asylum" },
-    { value: "citizenship_naturalization", label: "Citizenship / Naturalization" },
-  ],
-  real_estate_housing: [
-    { value: "landlord_tenant", label: "Landlord–Tenant" },
-    { value: "eviction", label: "Eviction" },
-    { value: "purchase_sale_dispute", label: "Purchase / Sale Dispute" },
-    { value: "foreclosure", label: "Foreclosure" },
-  ],
-  business_contract: [
-    { value: "breach_of_contract", label: "Breach of Contract" },
-    { value: "partnership_dispute", label: "Partnership Dispute" },
-    { value: "debt_collection", label: "Debt Collection" },
-  ],
-  estate_disability: [
-    { value: "estate_planning", label: "Estate Planning" },
-    { value: "probate", label: "Probate" },
-    { value: "social_security_disability", label: "Social Security Disability" },
-    { value: "veterans_benefits", label: "Veterans Benefits" },
+  employment_class: [
+    { value: "unpaid_wages", label: "Unpaid Wages" },
+    { value: "unpaid_overtime", label: "Unpaid Overtime" },
+    { value: "off_clock_work", label: "Off the Clock Work" },
+    { value: "missed_meal_rest_breaks", label: "Missed Meal or Rest Breaks" },
+    { value: "misclassification", label: "Misclassification" },
+    { value: "unreimbursed_expenses", label: "Unreimbursed Expenses" },
   ],
 };
 

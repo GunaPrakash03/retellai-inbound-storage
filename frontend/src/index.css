@@ -357,15 +357,15 @@ body {
   font-weight: 500;
 }
 
-.category-swatch.cat-personal_injury { background: var(--cat-1); }
-.category-swatch.cat-workplace_employment { background: var(--cat-2); }
-.category-swatch.cat-medical_product { background: var(--cat-3); }
-.category-swatch.cat-family_law { background: var(--cat-4); }
-.category-swatch.cat-criminal_defense { background: var(--cat-5); }
-.category-swatch.cat-immigration { background: var(--cat-6); }
-.category-swatch.cat-real_estate_housing { background: var(--cat-7); }
-.category-swatch.cat-business_contract { background: var(--cat-8); }
-.category-swatch.cat-estate_disability { background: var(--cat-9); }
+.category-swatch.cat-securities_fraud { background: var(--cat-1); }
+.category-swatch.cat-shareholder_derivative { background: var(--cat-2); }
+.category-swatch.cat-merger_transaction { background: var(--cat-3); }
+.category-swatch.cat-whistleblower_sec { background: var(--cat-4); }
+.category-swatch.cat-whistleblower_qui_tam { background: var(--cat-5); }
+.category-swatch.cat-whistleblower_retaliation { background: var(--cat-6); }
+.category-swatch.cat-consumer_class { background: var(--cat-7); }
+.category-swatch.cat-data_privacy_class { background: var(--cat-8); }
+.category-swatch.cat-employment_class { background: var(--cat-9); }
 .category-swatch.cat-other { background: var(--cat-10); }
 
 /* back link from a category's case list to the practice-area list */
@@ -496,15 +496,15 @@ tbody tr.selected {
   white-space: nowrap;
 }
 
-.badge.cat-personal_injury { background: var(--cat-1); }
-.badge.cat-workplace_employment { background: var(--cat-2); }
-.badge.cat-medical_product { background: var(--cat-3); }
-.badge.cat-family_law { background: var(--cat-4); }
-.badge.cat-criminal_defense { background: var(--cat-5); }
-.badge.cat-immigration { background: var(--cat-6); }
-.badge.cat-real_estate_housing { background: var(--cat-7); }
-.badge.cat-business_contract { background: var(--cat-8); }
-.badge.cat-estate_disability { background: var(--cat-9); }
+.badge.cat-securities_fraud { background: var(--cat-1); }
+.badge.cat-shareholder_derivative { background: var(--cat-2); }
+.badge.cat-merger_transaction { background: var(--cat-3); }
+.badge.cat-whistleblower_sec { background: var(--cat-4); }
+.badge.cat-whistleblower_qui_tam { background: var(--cat-5); }
+.badge.cat-whistleblower_retaliation { background: var(--cat-6); }
+.badge.cat-consumer_class { background: var(--cat-7); }
+.badge.cat-data_privacy_class { background: var(--cat-8); }
+.badge.cat-employment_class { background: var(--cat-9); }
 .badge.cat-other { background: var(--cat-10); }
 
 /* Matter type — a subordinate tag beside the coloured category badge in the
@@ -526,11 +526,6 @@ tbody tr.selected {
   margin-top: 3px;
   font-size: 11.5px;
   color: var(--ink-soft);
-}
-
-/* The third taxonomy level — a lighter tag than the matter-type badge. */
-.subtype-badge {
-  font-style: italic;
 }
 
 .flag {

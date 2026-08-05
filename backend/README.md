@@ -17,6 +17,8 @@ Interactive API docs: http://localhost:8000/docs
 | `POST` | `/webhooks/retell/inbound` | Fires before the call connects. Looks up caller history, returns dynamic variables. |
 | `POST` | `/webhooks/retell` | Fires on `call_started` / `call_ended` / `call_analyzed`. Only `call_analyzed` writes to the DB, into one of the six buckets below. |
 | `GET` | `/cases` | List completed cases. Query params: `category`, `status`, `limit`. |
+| `GET` | `/intake-fields` | The intake field spec — what the agent asks, per practice area, and which of those are must-ask. |
+| `GET` | `/taxonomy` | The ten practice areas and their matter types. |
 | `GET` | `/cases/{call_id}` | Full detail for one case, including transcript. |
 | `PATCH` | `/cases/{call_id}` | Update triage status. Body: `{"status": "reviewed"}`. |
 | `GET` | `/partial-calls`, `/unwanted-calls`, `/spam-calls`, `/out-of-scope-calls`, `/emergency-flags` | Same shape as `/cases`, for the other five buckets. |
@@ -38,8 +40,8 @@ fallback for when the transcript is missing:
 | `partial_calls` | Call disconnected or was cut short before intake finished. |
 | `unwanted_calls` | Nonsensical, contradictory, or clearly not a real intake (prank/test calls). |
 | `spam_calls` | Caller was coherent but repeatedly refused/deflected the actual intake questions. |
-| `out_of_scope_calls` | Genuine, polite callers who reached the wrong business (a technical question, a sales question, a wrong number). Not a legal matter, so not an intake — kept separate so the attorney queue stays clean and a spike here is visible (it can mean the number is listed somewhere wrong). |
-| `emergency_flags` | The 911/safety branch fired — saved here regardless of completeness, since staff need visibility on safety events. |
+| `out_of_scope_calls` | Genuine, polite callers who reached the wrong place — a technical or sales question, a wrong number, or a real legal matter in an area this firm doesn't practice (a divorce, a DUI, a car accident). Not an intake, so kept out of the attorney queue; a spike here is visible, and can mean the number is listed somewhere wrong. |
+| `emergency_flags` | The safety branch ended the call, or fired on a call that never finished — staff need visibility on safety events. A whistleblower who was in danger, confirmed safe, and then completed the whole intake lands in `cases` with `emergency_flagged` set instead, so a finished case isn't hidden from the attorney queue. |
 
 ## Data validation
 
@@ -53,37 +55,153 @@ after allowing for an optional 1-3 digit country code prefix, matching the
 phone-number rules in the agent prompt; `is_email_valid` requires a
 `local@domain.tld`-shaped address.
 
+## The intake field spec
+
+`app/intake_fields.py` is the single source of truth for what the agent
+collects. The database columns, the row the webhook writes, the fields staff
+can correct in the dashboard, the `/intake-fields` endpoint, and the Retell
+extraction config below are all generated from it, so adding a question to
+the agent prompt is one edit here rather than five edits that drift apart.
+
+It mirrors `agent-prompt-latest.txt` directly:
+
+- **Core fields** — the prompt's Step 2, asked on every call, plus the Step 5
+  retention answer and the flags the prompt sets internally.
+- **Category fields** — the prompt's Step 3, one list per practice area, each
+  field marked `must_ask` or not to match the prompt's own "Must ask" vs "Ask
+  if the conversation allows" split.
+
+`GET /cases/{call_id}` returns two derived keys alongside the record:
+`intake` (the labelled fields for that record's practice area) and
+`missing_must_ask` (must-ask questions that were never captured — the
+prompt's Step 4 check, applied to the record that actually landed). An
+"unknown" counts as asked; only a NULL counts as missing.
+
+Booleans are three-state — `1`, `0`, or `null` for never captured. The prompt
+is explicit that a question answered "I don't know" is a different fact from
+one never asked, and both differ from a "no", so a missing boolean is stored
+as `null` rather than collapsing to `0`.
+
+`time_sensitive` is the extraction's own answer ORed with the four deadline
+situations the prompt names — a securities lead plaintiff deadline, a merger
+vote or tender date, a retaliation adverse action, or a whistleblower matter
+not yet reported anywhere. Missing that flag costs a deadline nobody saw, so
+it isn't left to the extraction alone. See `validators.derive_time_sensitive`.
+
+## The ten practice areas
+
+`case_category` is one of: `securities_fraud`, `shareholder_derivative`,
+`merger_transaction`, `whistleblower_sec`, `whistleblower_qui_tam`,
+`whistleblower_retaliation`, `consumer_class`, `data_privacy_class`,
+`employment_class`, `other`.
+
+Each has a second level, the matter type (`case_subcategory`) — see
+`app/taxonomy.py` and `GET /taxonomy`. Retell can extract it, and when it
+doesn't, the Gemini classifier in `app/classify.py` fills it from the
+transcript after the call.
+
 ## Post-Call Data Extraction fields to configure in Retell
 
 Add these under **Agent → Post-Call Data Extraction**, matching name and
 type exactly — the webhook handler in `app/webhooks.py` reads these keys
-from `call.call_analysis.custom_analysis_data`.
+from `call.call_analysis.custom_analysis_data`. Regenerate this table with:
+
+```bash
+python3 -m tools.extraction_config            # this table
+python3 -m tools.extraction_config --plain    # one field per block, to copy
+```
+
+Plus two Selector fields that aren't in the spec because they don't hold an
+answer the caller gave:
 
 | Field | Type | Description to paste in Retell |
 |---|---|---|
-| `case_category` | Selector | One of: personal_injury, workplace_employment, medical_product, family_law, criminal_defense, immigration, real_estate_housing, business_contract, estate_disability, other |
-| `caller_name` | Text | Full name of the caller |
-| `callback_phone` | Text | Best callback number, digits only |
-| `email` | Text | Caller's email address |
-| `incident_date` | Text | Date of the incident/arrest/deadline in YYYY-MM-DD if determinable |
-| `location` | Text | City/state or address relevant to the matter |
-| `opposing_party` | Text | Other driver, employer, landlord, spouse, defendant — whoever the matter is against |
-| `key_date_or_deadline` | Text | Any court date, hearing, or filing deadline mentioned |
-| `represented_already` | Boolean | Already has another attorney or adjuster contact |
-| `injured` | Boolean | Did the caller sustain any injury (personal injury / workplace only) |
-| `emergency_flagged` | Boolean | Did the 911/safety branch get triggered during the call |
-| `police_report_filed` | Boolean | Was a police report filed |
-| `case_summary` | Text | One or two sentence description of the situation |
-| `additional_details` | Text | Catch-all for anything category-specific not covered above |
-| `call_outcome` | Selector | Look at the agent's LAST line before the call ended and match it to exactly one of these — do not judge the caller's behavior yourself, only match the agent's closing sentence: "completed" if the last line was the full readback ("So to confirm — your name is...") followed by "Thank you — I have everything I need...". "partial" if the last line was "It looks like we may have gotten disconnected, or you're not able to hear me right now...". "unwanted" if the last line was "I want to make sure I'm getting accurate information for the attorney, and I'm having a hard time following the details...". "spam" if the last line was "It sounds like now might not be the right time to go through these details...". If the last line was "Please hang up and call 911 right now" or the domestic-violence safety line, that call has no separate call_outcome relevance since emergency_flagged already covers it — pick "partial" as a default in that case. |
+| `case_category` | Selector | One of: securities_fraud, shareholder_derivative, merger_transaction, whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation, consumer_class, data_privacy_class, employment_class, other |
+| `case_subcategory` | Selector | The matter type within that area — see `GET /taxonomy` for the list per category. Leave unset if unclear; the backend fills it from the transcript. |
+
+The "Asked in" column is which practice areas ask the question; every field
+is safe to configure once, since a field a category never asks simply stays
+empty on those records.
+
+| Field | Type | Asked in | Description to paste in Retell |
+|---|---|---|---|
+| `caller_name` | Text | all | Full name of the caller, as spelled out on the call |
+| `callback_phone` | Text | all | Best callback number, digits only, with country code if given |
+| `email` | Text | all | Caller's email address |
+| `mailing_address` | Text | all | Best mailing address — city, state and ZIP at minimum |
+| `case_summary` | Text | all | One or two sentence summary of the situation, in the caller's words |
+| `represented_already` | Boolean | all | True if the caller already has another attorney on this matter, or has already spoken with another firm about it |
+| `other_firm_name` | Text | all | Name of the other attorney or firm, if the caller is already represented or has spoken with one |
+| `prior_contact` | Text | all | Who has already contacted the caller or taken a statement about this — the company, its lawyers, an investigator, a government agency. "no" if none |
+| `referral_source` | Text | all | How the caller heard about the firm |
+| `caller_affiliation` | Text | all | Whether the caller is currently an employee, officer, or director of the company involved (conflict check). "none" if they are not |
+| `retention_consent` | Text | all | Whether the caller wants a retention agreement emailed if the attorney takes it on: yes, no, or undecided |
+| `time_sensitive` | Boolean | all | True if a lead plaintiff deadline, court notice, vote or tender date, filing deadline, or first-to-file whistleblower exposure came up |
+| `whistleblower_limited_disclosure` | Boolean | all | True if a whistleblower caller chose not to give details and only name, number, email, and employer or industry were taken |
+| `emergency_flagged` | Boolean | all | True only if the safety branch actually fired — the caller was told to hang up and call 911, or a whistleblower said they were in danger |
+| `additional_details` | Text | all | Anything relevant that no other field covers |
+| `issuer_name` | Text | securities_fraud, shareholder_derivative, merger_transaction | Name of the company whose securities are involved |
+| `ticker_symbol` | Text | securities_fraud, shareholder_derivative, merger_transaction | Ticker symbol, letters only, as read back on the call |
+| `position_status` | Text | securities_fraud, merger_transaction | Whether the caller bought, sold, or still holds the securities |
+| `purchase_period` | Text | securities_fraud, consumer_class | Roughly when the caller bought, and whether once or over a period |
+| `position_size` | Text | securities_fraud, merger_transaction | Roughly how many shares or units, or the total dollar amount invested |
+| `still_holding` | Boolean | securities_fraud | True if the caller still holds any of the securities today |
+| `triggering_event` | Text | securities_fraud | What made the caller think something was wrong — a stock drop, a news story, an SEC filing, a law firm press release |
+| `lead_plaintiff_deadline` | Text | securities_fraud | The exact date on any notice or press release the caller mentioned |
+| `records_available` | Boolean | securities_fraud, consumer_class, data_privacy_class, employment_class | True if the caller has supporting records — statements, receipts, pay stubs, the notice letter |
+| `brokerage_name` | Text | securities_fraud | Which brokerage or platform the caller used |
+| `account_type` | Text | securities_fraud | Whether the shares were held in a retirement or trust account |
+| `prior_lead_plaintiff` | Boolean | securities_fraud | True if the caller has served as a lead plaintiff or class representative before |
+| `ownership_start` | Text | shareholder_derivative | Roughly when the caller acquired their shares |
+| `continuous_ownership` | Boolean | shareholder_derivative | True if the caller has held the shares continuously since then |
+| `conduct_alleged` | Text | shareholder_derivative, merger_transaction, whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation, consumer_class, employment_class, other | What the caller says was done wrong, in their own words |
+| `information_source` | Text | shareholder_derivative | How the caller learned about the conduct |
+| `demand_status` | Text | shareholder_derivative | Whether a books-and-records or litigation demand has been sent, and any response |
+| `related_proceedings` | Text | shareholder_derivative | Any pending investigation, SEC action, or related lawsuit the caller knows of |
+| `opposing_party` | Text | merger_transaction, whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation, consumer_class, data_privacy_class, employment_class, other | The company, employer, agency, or acquirer the matter is against |
+| `key_date_or_deadline` | Text | merger_transaction, whistleblower_sec, whistleblower_qui_tam | Any vote, tender, closing, filing, or hearing date the caller mentioned |
+| `vote_status` | Text | merger_transaction | Whether the caller has already voted or tendered |
+| `incident_period` | Text | whistleblower_sec, whistleblower_qui_tam | Roughly when the conduct happened, or whether it is still happening |
+| `prior_report` | Text | whistleblower_sec, whistleblower_qui_tam | Anyone the caller has already reported this to — SEC, CFTC, DOJ, an inspector general, an internal hotline, another law firm. "no" if none |
+| `still_employed` | Boolean | whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation, employment_class | True if the caller still works for the employer involved |
+| `job_title` | Text | whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation, employment_class | The caller's role or job title |
+| `documentation_exists` | Boolean | whistleblower_sec, whistleblower_qui_tam, whistleblower_retaliation | True if the caller says they have documents or records. Never ask what they contain or where they are kept |
+| `others_aware` | Boolean | whistleblower_sec, whistleblower_qui_tam | True if anyone else knows the caller is raising this |
+| `reported_to` | Text | whistleblower_retaliation | Who the caller reported the underlying conduct to |
+| `reported_date` | Text | whistleblower_retaliation | Roughly when the caller reported it |
+| `adverse_action` | Text | whistleblower_retaliation | What happened to the caller afterward — fired, demoted, suspended, hours cut, transferred |
+| `incident_date` | Text | whistleblower_retaliation, other | Date of the adverse action or key event, YYYY-MM-DD if determinable |
+| `employment_length` | Text | whistleblower_retaliation | How long the caller worked there |
+| `witnesses` | Text | whistleblower_retaliation | Anyone who saw or knows about what happened |
+| `agency_filing` | Text | whistleblower_retaliation | Whether the caller filed with OSHA, the EEOC, or a state agency, and when |
+| `product_name` | Text | consumer_class | The product or service involved |
+| `purchase_channel` | Text | consumer_class | Where it was bought — a store, a website, an app, a subscription |
+| `amount_paid` | Text | consumer_class | Roughly how much the caller paid or was charged |
+| `purchase_state` | Text | consumer_class | The state the caller bought it in or was living in at the time |
+| `company_contacted` | Text | consumer_class | Whether the caller contacted the company about it, and what happened |
+| `others_affected` | Boolean | consumer_class, employment_class, other | True if the caller believes other people were treated the same way |
+| `physical_injury` | Boolean | consumer_class | True if the caller was physically harmed by the product. Flag for attorney review; do not pursue injury details |
+| `notice_received` | Boolean | data_privacy_class | True if the caller received a breach notice letter or email |
+| `notice_date` | Text | data_privacy_class | The date on the breach notice |
+| `data_types_involved` | Text | data_privacy_class | Kinds of information involved — name, Social Security number, financial account, medical, biometric. Never record an actual account or SSN |
+| `harm_experienced` | Text | data_privacy_class | Any actual misuse seen — fraudulent charges, accounts opened, tax filings, identity theft |
+| `residence_state` | Text | data_privacy_class | What state the caller lives in |
+| `relationship_type` | Text | data_privacy_class | Whether the caller was a customer, patient, employee, or user, and roughly when |
+| `out_of_pocket_costs` | Text | data_privacy_class | Whether the caller paid for credit monitoring or spent time dealing with it |
+| `pay_type` | Text | employment_class | Whether the caller was paid hourly or salaried |
+| `employment_period` | Text | employment_class | Roughly what dates the caller worked there |
+| `work_state` | Text | employment_class | Which state the caller worked in |
+| `hours_worked` | Text | employment_class | Roughly how many hours a week the caller worked |
+| `arbitration_agreement` | Boolean | employment_class | True if the caller signed an arbitration agreement or class waiver |
+| `reported_internally` | Boolean | employment_class | True if the caller raised it with HR or a supervisor |
 
 Keep the default `Call Summary`, `Call Successful`, and `User Sentiment`
 fields too — the backend stores those alongside the custom ones.
 
-`call_outcome` is a fallback signal only — bucket routing is primarily
-decided by matching the agent's scripted closing lines directly in the
-transcript (see "Call buckets" above). Configuring `call_outcome` is
-optional at this point but doesn't hurt to keep as a backup.
+`call_outcome` is optional. Bucket routing is decided by matching the agent's
+scripted closing lines in the transcript (see "Call buckets" above);
+`call_outcome` is only consulted as a fallback for "unwanted"/"spam" when the
+transcript is missing.
 
 ## Signature verification
 
